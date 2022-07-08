@@ -10,6 +10,8 @@
  * SSPin      : This pin controls DAC8562 
  * accPin     : This is accelerate pin.  (PWM output)
  * directPin  : This is direction pin    (digital output)
+ * Clock      : Pin 13
+ * Din        : Pin 11
  * diameter   : 18 inch tire 
  * gear_ratio : gear ratio is 16.99
  * REF_POWER  : This power is for referencing by DAC8562
@@ -28,7 +30,7 @@
  * data --> {acc, dec, direction}
  *      acc : 0 ~ 5 V 
  *      dec : 0 ~ 5 V
- *      direction : 1 : forward, 2 : reverse
+ *      direction : 0 : forward, 1 : reverse
  * distance --> distance during moter running a cycle
  */
 int mode = 0;          
@@ -62,15 +64,17 @@ void getData() {
     int i = 0;
     char chr;
     if (Serial.available() > 0) {
-        data[0] = data[1] = 0;
+        data[0] = data[1] = data[2] = 0;
+        
         while ((chr = Serial.read()) != '\n' && i < 3) {
             if (chr == ',') i++;
             if (chr >= '0' && chr <= '9') data[i] = data[i] * 10 + (chr - '0');
         }
-        if (data[2] == 2) digitalWrite(directPin, HIGH);
+        if (data[2] == 1) digitalWrite(directPin, HIGH);
         else digitalWrite(directPin, LOW);
-        data[0] = map(data[0], 0., 100., 0., 5.);
-        data[1] = map(data[1], 0., 100., 0., 5.);
+        data[0] = data[0] / 100.0 * 5;
+        data[1] = data[1] / 100.0 * 5;
+        
         dac.writeA(data[0]);
         dac.writeB(data[1]);
     }
@@ -85,7 +89,7 @@ void showInfo() {
     Serial.print("Brake Voltage : ");
     Serial.println(data[1]);
     Serial.print("Direction : ");
-    if (data[2] == 2) Serial.println("Reverse");
+    if (data[2] == 1) Serial.println("Reverse");
     else Serial.println("Forward");
     return;
 }
