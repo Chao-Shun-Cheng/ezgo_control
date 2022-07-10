@@ -5,6 +5,13 @@
  */ 
 #include "DAC8562.h"
 
+/*for feedback data in ros*/
+#include <ros.h>
+#include <string.h>
+#include <std_msgs/String.h>
+#include <std_msgs/UInt16.h>
+#include <string.h>
+
 /*
  * modePin    : This is mode change pin. (digital input)
  * SSPin      : This pin controls DAC8562 
@@ -43,14 +50,25 @@ float distance = diameter * pi / gear_ratio * 1000 * 3.6;
 double previousTime = 0;
 DAC8562 dac = DAC8562(SSPin, REF_POWER);
 
+/*for feedback data in ros*/
+String result = "0000";
+ros::NodeHandle  nh;
+std_msgs::String str_msg;
+ros::Publisher chatter("feedback", &str_msg);
+/*result --> parameters to return to ros*/
+
+
 void setup() {
-    Serial.begin(9600);    
+    Serial.begin(57600);   
     dac.begin(); 
     attachInterrupt(digitalPinToInterrupt(interruptPin), calVel, RISING);
     pinMode(directPin, OUTPUT);  
     pinMode(modePin, INPUT);  
     pinMode(interruptPin, INPUT_PULLUP);
     pinMode(lightPin, OUTPUT);
+
+    nh.initNode();        
+    nh.advertise(chatter);
 }
 
 void loop() {
@@ -60,6 +78,16 @@ void loop() {
         showInfo();
     } else {
       Serial.println("manual mode");
+
+      result ="manual mode";
+      char x[60];
+      result.toCharArray(x,60);
+      str_msg.data= x;
+      chatter.publish(&str_msg);
+      nh.spinOnce();
+      delay(50);
+      
+      return;
     }
     delay(100);
 }
@@ -91,17 +119,28 @@ void showInfo() {
     Serial.println("----------------");
     Serial.println("autonomous mode");
     Serial.print("Throttle Voltage : ");
-    Serial.println(data[0]);
+    Serial.println(data[0]);\
     Serial.print("Brake Voltage : ");
     Serial.println(data[1]);
     Serial.print("Direction : ");
-    if (data[2] == 1) Serial.println("Reverse");
+    if (data[2] == 1) {
+      Serial.println("Reverse");
+    }
     else Serial.println("Forward");
     if (data[3] == 1) Serial.println("Lights ON");
     else Serial.println("Lights OFF");
-    return;
-}
+    
 
+    result ="autonomous mode";
+    char x[60];
+    result.toCharArray(x,60);
+    str_msg.data= x;
+    chatter.publish(&str_msg);
+    nh.spinOnce();
+    delay(50);
+    return;
+
+}
 void calVel() {
     static int count = 0;
     count = count + 1;
@@ -112,3 +151,13 @@ void calVel() {
     }
     return;
 }
+
+/* block for change to ros data  
+  char x[60];
+  result.toCharArray(x,60);
+  str_msg.data= x;
+  chatter.publish(&str_msg);
+  nh.spinOnce();
+  delay(50);
+  return;
+*/
