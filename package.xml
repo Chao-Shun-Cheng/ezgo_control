@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>ezgo_control</name>
+  <version>0.0.0</version>
+  <description>The ezgo_control package</description>
+  <maintainer email="chao.shun.cheng.tw@gmail.com">Chao Shun Cheng</maintainer>
+  <author email="chao.shun.cheng.tw@gmail.com">Chao Shun Cheng</author>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>autoware_msgs</build_depend>
+  <build_depend>tablet_socket_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>autoware_can_msgs</build_depend>
+  <build_export_depend>autoware_msgs</build_export_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>tablet_socket_msgs</build_export_depend>
+  <build_export_depend>autoware_can_msgs</build_export_depend>
+  <exec_depend>autoware_msgs</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tablet_socket_msgs</exec_depend>
+  <exec_depend>autoware_can_msgs</exec_depend>
+
+</package>
