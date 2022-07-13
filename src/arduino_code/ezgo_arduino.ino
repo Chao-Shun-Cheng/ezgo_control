@@ -37,15 +37,18 @@
  * distance --> distance during moter running a cycle
  */
 int mode = 0;
-volatile float data[4] = {0, 0, 0, 0};
 volatile float vel = 0;
 float distance = diameter * pi / gear_ratio * 1000 * 3.6;
 double previousTime = 0;
 DAC8562 dac = DAC8562(SSPin, REF_POWER);
 
+byte writer_buf[8] = {0};
+byte reader_buf[3] = {0};
+
 void setup()
 {
-    Serial.begin(9600);
+    Serial.begin(115200);
+    Serial.setTimeout(200);
     dac.begin();
     attachInterrupt(digitalPinToInterrupt(interruptPin), calVel, RISING);
     pinMode(directPin, OUTPUT);
@@ -59,60 +62,36 @@ void loop()
     int mode = digitalRead(modePin);
     if (mode == HIGH) {
         getData();
-        showInfo();
-    } else {
-        Serial.println("manual mode");
-    }
+    } 
+    showInfo();
     delay(100);
 }
 
 void getData()
 {
-    int i = 0;
-    char chr;
-    if (Serial.available() > 0) {
-        data[0] = data[1] = data[2] = data[3] = 0;
-
-        while ((chr = Serial.read()) != '\n' && i < 4) {
-            if (chr == ',')
-                i++;
-            if (chr >= '0' && chr <= '9')
-                data[i] = data[i] * 10 + (chr - '0');
-        }
-        if (data[2] == 1)
-            digitalWrite(directPin, HIGH);
-        else
-            digitalWrite(directPin, LOW);
-        if (data[3] == 1)
-            digitalWrite(lightPin, HIGH);
-        else
-            digitalWrite(lightPin, LOW);
-        data[0] = data[0] / 100.0 * 5;
-        data[1] = data[1] / 100.0 * 5;
-
-        dac.writeA(data[0]);
-        dac.writeB(data[1]);
+    Serial.readBytes(reader_buf, 3);
+    dac.writeA(((int) 0x00000000 | reader_buf[0]) / 255.0 * 5.0);
+    dac.writeB(((int) 0x00000000 | reader_buf[1]) / 255.0 * 5.0);
+    if (reader_buf[2] & 0x1) {
+        digitalWrite(directPin, HIGH);
+    } else {
+        digitalWrite(directPin, LOW);
     }
     return;
 }
 
 void showInfo()
 {
-    Serial.println("----------------");
-    Serial.println("autonomous mode");
-    Serial.print("Throttle Voltage : ");
-    Serial.println(data[0]);
-    Serial.print("Brake Voltage : ");
-    Serial.println(data[1]);
-    Serial.print("Direction : ");
-    if (data[2] == 1)
-        Serial.println("Reverse");
-    else
-        Serial.println("Forward");
-    if (data[3] == 1)
-        Serial.println("Lights ON");
-    else
-        Serial.println("Lights OFF");
+    writer_buf[0] = reader_buf[0];
+    writer_buf[1] = reader_buf[1];
+    writer_buf[2] = reader_buf[2];
+    writer_buf[3] = mode & 0x1;
+    float current_vel = vel;
+    writer_buf[4] = current_vel & 0xff;
+    writer_buf[5] = (current_vel >> 8) & 0xff;
+    writer_buf[6] = (current_vel >> 16) & 0xff;
+    writer_buf[7] = (current_vel >> 24) & 0xff;
+    Serial.write(writer_buf, 8);
     return;
 }
 
