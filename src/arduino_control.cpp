@@ -62,7 +62,7 @@ static void *reader_handler(void *args)
 }
 
 int main(int argc, char **argv) {
-	ros::init(argc, argv, "arduino_comtrol");
+	ros::init(argc, argv, "arduino_cotrol");
 	ros::NodeHandle nh;
 
 	ros::Subscriber sub[6];
