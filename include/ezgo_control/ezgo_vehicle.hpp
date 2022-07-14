@@ -21,14 +21,20 @@
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
 
+enum Light {OFF, ON};
+
+enum Shift {FORWARD, REVERSE};
+
+enum Mode {MANUAL, AUTONOMOUS};
+
 typedef struct vehicle_info {
     int throttle;
     int brake;
     float steering_angle;
     float velocity;
-    int control_mode;   // 1 : autonomous mode, 0 : manual mode
-    int shift;          // 0 : Forward, 1 : Reverse
-    int light;          // 0 : OFF, 1 : ON
+    bool control_mode;   // 1 : autonomous mode, 0 : manual mode
+    bool shift;          // 0 : Forward, 1 : Reverse
+    bool light;          // 0 : OFF, 1 : ON
 } vehicle_info_t;
 
 typedef struct vehicle_cmd {
@@ -99,23 +105,23 @@ void vehicle_control()
 
 void showVehicleInfo() 
 {
-    if (vehicle_info.control_mode == 0) {
+    if (vehicle_info.control_mode == MANUAL) {
         std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
         std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     }
         
-    else if (vehicle_info.control_mode == 1) {
+    else if (vehicle_info.control_mode == AUTONOMOUS) {
         std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
         std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
         std::cout << "Brake : " << vehicle_info.brake << std::endl;
         std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     }
-    if (vehicle_info.light == 1)
+    if (vehicle_info.light == ON)
         std::cout << "Light : ON" << std::endl;
-    else
+    else 
         std::cout << "Light : OFF" << std::endl;
 
-    if (vehicle_info.shift == 0)
+    if (vehicle_info.shift == FORWARD)
         std::cout << "Shift : Forward" << std::endl;
     else
         std::cout << "Shift : Reverse" << std::endl;

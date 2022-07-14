@@ -10,6 +10,7 @@ int willExit = 0;
 
 static void *writer_handler(void *args) 
 {
+	printf("ENTER ezgo_vehicle_control Writer thread.\n");
 	SerialPort *serialPort = (SerialPort *) args;
 	
 	while (ros::ok() && !willExit) {
@@ -32,26 +33,28 @@ static void *writer_handler(void *args)
 		}
 	}
 	printf("EXIT ezgo_vehicle_control Writer thread.\n");
-	
-	
 	return nullptr;
 }
 
 static void *reader_handler(void *args) 
 {
+	printf("ENTER ezgo_vehicle_control Reader thread.\n");
 	SerialPort *serialPort = (SerialPort *) args;
 	while(ros::ok() && !willExit) {
         std::string readData;
 		pthread_mutex_lock(&mutex);
         serialPort->Read(readData);
 		pthread_mutex_unlock(&mutex);
-		if (readData.size() == 8) {
-			vehicle_info.throttle = (int) readData[0];
-			vehicle_info.brake = (int) readData[1];
-			vehicle_info.light = (int) (readData[2] & 0xf0) >> 4;
-			vehicle_info.shift = (int) readData[2] & 0xf;
-			vehicle_info.control_mode = (int) readData[3] & 0xf;
-			vehicle_info.velocity = (float) (readData[4] | (readData[5] << 8) | (readData[6] << 16) | (readData[7] << 24));
+		if (readData.size() == 5) {
+			vehicle_info.throttle = readData[0];
+			vehicle_info.brake = readData[1];
+			vehicle_info.control_mode = ((uint8_t) readData[2]) & 0x1;
+			vehicle_info.light = ((uint8_t) readData[2]) & 0x2;
+			vehicle_info.shift = ((uint8_t) readData[2]) & 0x4;
+			uint16_t vel = 0;
+			vel = (((uint16_t) readData[3]) << 8) & 0xFF00;
+			vel |= ((uint16_t) readData[4]) & 0xFF;
+			vehicle_info.velocity = ((float) vel) / 1000; 
 			showVehicleInfo();
 		} else {
 			std::cout << RED << "Without Receive DATA, Check connect ...." << RESET << std::endl;
