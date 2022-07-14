@@ -17,7 +17,7 @@
  * REF_POWER  : This power is for referencing by DAC8562
  * lightPin   : This pin controls front and tail lights.
  */
-#define modePin 7
+#define modePin 22
 #define SSPin 10
 #define interruptPin 2
 #define directPin 4
@@ -42,7 +42,7 @@ float distance = diameter * pi / gear_ratio * 1000 * 3.6;
 double previousTime = 0;
 DAC8562 dac = DAC8562(SSPin, REF_POWER);
 
-byte writer_buf[8] = {0};
+byte writer_buf[5] = {0};
 byte reader_buf[3] = {0};
 
 void setup()
@@ -70,8 +70,8 @@ void loop()
 void getData()
 {
     Serial.readBytes(reader_buf, 3);
-    dac.writeA(((int) 0x00000000 | reader_buf[0]) / 255.0 * 5.0);
-    dac.writeB(((int) 0x00000000 | reader_buf[1]) / 255.0 * 5.0);
+    dac.writeA(((float) reader_buf[0]) / 255.0 * 5.0);
+    dac.writeB(((float) reader_buf[1]) / 255.0 * 5.0);
     if (reader_buf[2] & 0x1) {
         digitalWrite(directPin, HIGH);
     } else {
@@ -84,14 +84,12 @@ void showInfo()
 {
     writer_buf[0] = reader_buf[0];
     writer_buf[1] = reader_buf[1];
-    writer_buf[2] = reader_buf[2];
-    writer_buf[3] = mode & 0x1;
-    float current_vel = vel;
+    writer_buf[2] = (((byte) mode) & 0x1) | (reader_buf[2] & 0x4);
+    
+    int current_vel = vel * 1000;
+    writer_buf[3] = (current_vel & 0xff00) >> 8;
     writer_buf[4] = current_vel & 0xff;
-    writer_buf[5] = (current_vel >> 8) & 0xff;
-    writer_buf[6] = (current_vel >> 16) & 0xff;
-    writer_buf[7] = (current_vel >> 24) & 0xff;
-    Serial.write(writer_buf, 8);
+    Serial.write(writer_buf, 5);
     return;
 }
 
