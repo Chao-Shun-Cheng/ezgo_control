@@ -17,7 +17,7 @@
  * REF_POWER  : This power is for referencing by DAC8562
  * lightPin   : This pin controls front and tail lights.
  */
-#define modePin 22
+#define modePin 7
 #define SSPin 10
 #define interruptPin 2
 #define directPin 4
@@ -47,19 +47,19 @@ byte reader_buf[3] = {0};
 
 void setup()
 {
-    Serial.begin(115200);
-    Serial.setTimeout(200);
-    dac.begin();
-    attachInterrupt(digitalPinToInterrupt(interruptPin), calVel, RISING);
     pinMode(directPin, OUTPUT);
     pinMode(modePin, INPUT);
     pinMode(interruptPin, INPUT_PULLUP);
     pinMode(lightPin, OUTPUT);
+    Serial.begin(115200);
+    Serial.setTimeout(50);
+    dac.begin();
+    attachInterrupt(digitalPinToInterrupt(interruptPin), calVel, RISING);
 }
 
 void loop()
 {
-    int mode = digitalRead(modePin);
+    mode = digitalRead(modePin);
     if (mode == HIGH) {
         getData();
     } 
@@ -69,13 +69,14 @@ void loop()
 
 void getData()
 {
-    Serial.readBytes(reader_buf, 3);
-    dac.writeA(((float) reader_buf[0]) / 255.0 * 5.0);
-    dac.writeB(((float) reader_buf[1]) / 255.0 * 5.0);
-    if (reader_buf[2] & 0x1) {
-        digitalWrite(directPin, HIGH);
-    } else {
-        digitalWrite(directPin, LOW);
+    if (Serial.readBytes(reader_buf, 3) == 3) {
+        dac.writeA(((float) reader_buf[0]) / 255.0 * 5.0);
+        dac.writeB(((float) reader_buf[1]) / 255.0 * 5.0);
+        if (reader_buf[2] & 0x1) {
+            digitalWrite(directPin, HIGH);
+        } else {
+            digitalWrite(directPin, LOW);
+        }
     }
     return;
 }
@@ -84,7 +85,8 @@ void showInfo()
 {
     writer_buf[0] = reader_buf[0];
     writer_buf[1] = reader_buf[1];
-    writer_buf[2] = (((byte) mode) & 0x1) | (reader_buf[2] & 0x4);
+    
+    writer_buf[2] = (mode & 0x1) | (reader_buf[2] & 0x4);
     
     int current_vel = vel * 1000;
     writer_buf[3] = (current_vel & 0xff00) >> 8;

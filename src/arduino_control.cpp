@@ -48,9 +48,9 @@ static void *reader_handler(void *args)
 		if (readData.size() == 5) {
 			vehicle_info.throttle = readData[0];
 			vehicle_info.brake = readData[1];
-			vehicle_info.control_mode = ((uint8_t) readData[2]) & 0x1;
-			vehicle_info.light = ((uint8_t) readData[2]) & 0x2;
-			vehicle_info.shift = ((uint8_t) readData[2]) & 0x4;
+			vehicle_info.control_mode = (bool) readData[2] & 0x1;
+			vehicle_info.light = (bool) readData[2] & 0x2;
+			vehicle_info.shift = (bool) readData[2] & 0x4;
 			uint16_t vel = 0;
 			vel = (((uint16_t) readData[3]) << 8) & 0xFF00;
 			vel |= ((uint16_t) readData[4]) & 0xFF;
