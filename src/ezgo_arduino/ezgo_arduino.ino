@@ -62,7 +62,7 @@ void loop()
     mode = digitalRead(modePin);
     if (mode == HIGH) {
         getData();
-    } 
+    }
     showInfo();
     delay(100);
 }
@@ -85,9 +85,9 @@ void showInfo()
 {
     writer_buf[0] = reader_buf[0];
     writer_buf[1] = reader_buf[1];
-    
+
     writer_buf[2] = (mode & 0x1) | (reader_buf[2] & 0x4);
-    
+
     int current_vel = vel * 1000;
     writer_buf[3] = (current_vel & 0xff00) >> 8;
     writer_buf[4] = current_vel & 0xff;

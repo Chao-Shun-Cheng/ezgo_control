@@ -1,15 +1,19 @@
 #include <pthread.h>
-#include <signal.h>
-#include <iostream>
-
 #include <ros/ros.h>
-#include <tablet_socket_msgs/gear_cmd.h>
-#include <tablet_socket_msgs/mode_cmd.h>
+#include <signal.h>
+#include <unistd.h>
+#include <iostream>
+#include <string>
+#include <vector>
+#include <math.h>
+
 #include <autoware_msgs/AccelCmd.h>
 #include <autoware_msgs/BrakeCmd.h>
 #include <autoware_msgs/SteerCmd.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <std_msgs/Float32.h>
+#include <tablet_socket_msgs/gear_cmd.h>
+#include <tablet_socket_msgs/mode_cmd.h>
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -21,30 +25,30 @@
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
 
-enum Light {OFF, ON};
+enum Light { OFF, ON };
 
-enum Shift {FORWARD, REVERSE};
+enum Shift { FORWARD, REVERSE };
 
-enum Mode {MANUAL, AUTONOMOUS};
+enum Mode { MANUAL, AUTONOMOUS };
 
 typedef struct vehicle_info {
     int throttle;
     int brake;
     float steering_angle;
     float velocity;
-    bool control_mode;   // 1 : autonomous mode, 0 : manual mode
-    bool shift;          // 0 : Forward, 1 : Reverse
-    bool light;          // 0 : OFF, 1 : ON
+    bool control_mode;  // 1 : autonomous mode, 0 : manual mode
+    bool shift;         // 0 : Forward, 1 : Reverse
+    bool light;         // 0 : OFF, 1 : ON
 } vehicle_info_t;
 
 typedef struct vehicle_cmd {
     double linear_x;
     double angular_z;
-    int modeValue;      // 0 : manual, 1 : auto pilot, 2 : UI direct control
-    int shift;          // 0 : Forward, 1 : Reverse
-    int accel_stroke;   
+    int modeValue;  // 0 : manual, 1 : auto pilot, 2 : UI direct control
+    int shift;      // 0 : Forward, 1 : Reverse
+    int accel_stroke;
     int brake_stroke;
-    int steering_angle; 
+    int steering_angle;
     char light;
 } vehicle_cmd_t;
 
@@ -98,18 +102,18 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
     vehicle_cmd.brake_stroke = brake.brake;
 }
 
-void vehicle_control() 
+void vehicle_control()
 {
-    
+    // TODO
 }
 
-void showVehicleInfo() 
+void showVehicleInfo()
 {
     if (vehicle_info.control_mode == MANUAL) {
         std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
         std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     }
-        
+
     else if (vehicle_info.control_mode == AUTONOMOUS) {
         std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
         std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
@@ -118,7 +122,7 @@ void showVehicleInfo()
     }
     if (vehicle_info.light == ON)
         std::cout << "Light : ON" << std::endl;
-    else 
+    else
         std::cout << "Light : OFF" << std::endl;
 
     if (vehicle_info.shift == FORWARD)
@@ -165,4 +169,3 @@ int app_setup_signals()
 END:
     return ret;
 }
-
