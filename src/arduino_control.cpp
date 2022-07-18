@@ -8,64 +8,75 @@ vehicle_info_t vehicle_info;
 vehicle_cmd_t vehicle_cmd;
 int willExit = 0;
 
-static void *writer_handler(void *args) 
+static void *writer_handler(void *args)
 {
-	SerialPort *serialPort = (SerialPort *) args;
+    std::cout << YELLOW << "ENTER ezgo_vehicle_control Writer thread.\n" << RESET << std::endl;
+    SerialPort *serialPort = (SerialPort *) args;
+	cmd_reset();
 	
-	while (ros::ok() && !willExit) {
-		switch (vehicle_cmd.modeValue) {
-		case 0:
-			cmd_reset();
-			break;
-		case 1: // autonomous mode
-			cmd_reset();
-			break; 
-		case 2: // UI direct control
-			std::vector<uint8_t> data;
-			data.push_back((uint8_t) vehicle_cmd.accel_stroke);
-			data.push_back((uint8_t) vehicle_cmd.brake_stroke);
-			data.push_back((uint8_t) vehicle_cmd.shift);
-			pthread_mutex_lock(&mutex);
-			serialPort->WriteBinary(data);
-			pthread_mutex_unlock(&mutex);
-			break;
-		}
-	}
-	printf("EXIT ezgo_vehicle_control Writer thread.\n");
-	
-	
-	return nullptr;
-}
-
-static void *reader_handler(void *args) 
-{
-	SerialPort *serialPort = (SerialPort *) args;
-	while(ros::ok() && !willExit) {
-        std::string readData;
-		pthread_mutex_lock(&mutex);
-        serialPort->Read(readData);
-		pthread_mutex_unlock(&mutex);
-		if (readData.size() == 8) {
-			vehicle_info.throttle = (int) readData[0];
-			vehicle_info.brake = (int) readData[1];
-			vehicle_info.light = (int) (readData[2] & 0xf0) >> 4;
-			vehicle_info.shift = (int) readData[2] & 0xf;
-			vehicle_info.control_mode = (int) readData[3] & 0xf;
-			vehicle_info.velocity = (float) (readData[4] | (readData[5] << 8) | (readData[6] << 16) | (readData[7] << 24));
-			showVehicleInfo();
-		} else {
-			std::cout << RED << "Without Receive DATA, Check connect ...." << RESET << std::endl;
-		}
+    while (ros::ok() && !willExit) {
+        switch (vehicle_cmd.modeValue) {
+        case 0:
+            cmd_reset();
+            break;
+        case 1:  // autonomous mode
+            cmd_reset();
+            break;
+        case 2:  // UI direct control
+            std::vector<uint8_t> data;
+            data.push_back((uint8_t) vehicle_cmd.accel_stroke);
+            data.push_back((uint8_t) vehicle_cmd.brake_stroke);
+            data.push_back((uint8_t) vehicle_cmd.shift);
+            pthread_mutex_lock(&mutex);
+            serialPort->WriteBinary(data);
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
     }
-	printf("EXIT ezgo_vehicle_control Reader thread.\n");
-	return nullptr;
+    std::cout << YELLOW << "EXIT ezgo_vehicle_control Writer thread.\n" << RESET << std::endl;
+    return nullptr;
 }
 
-int main(int argc, char **argv) {
-	ros::init(argc, argv, "arduino_comtrol");
-	ros::NodeHandle nh;
+static void *reader_handler(void *args)
+{
+    std::cout << YELLOW << "ENTER ezgo_vehicle_control Reader thread.\n" << RESET << std::endl;
+    SerialPort *serialPort = (SerialPort *) args;
+    while (ros::ok() && !willExit) {
+        std::string readData;
+        pthread_mutex_lock(&mutex);
+        serialPort->Read(readData);
+        pthread_mutex_unlock(&mutex);
+        if (readData.size() == 5) {
+            vehicle_info.throttle = readData[0];
+            vehicle_info.brake = readData[1];
+            vehicle_info.control_mode = (bool) readData[2] & 0x1;
+            vehicle_info.light = (bool) readData[2] & 0x2;
+            vehicle_info.shift = (bool) readData[2] & 0x4;
+            uint16_t vel = 0;
+            vel = (((uint16_t) readData[3]) << 8) & 0xFF00;
+            vel |= ((uint16_t) readData[4]) & 0xFF;
+            vehicle_info.velocity = ((float) vel) / 1000;
+            showVehicleInfo();
+        } else {
+            std::cout << RED << "Without Receive DATA, Check connect ...." << RESET << std::endl;
+        }
+    }
+    std::cout << YELLOW << "EXIT ezgo_vehicle_control Reader thread.\n" << RESET << std::endl;
+    return nullptr;
+}
 
-	ros::Subscriber sub[6];
+int main(int argc, char **argv)
+{
+    int ret = app_setup_signals();
+    if (ret == -1) {
+        printf("Fail to app_setup_signals\n");
+        return -1;
+    }
+
+    ros::init(argc, argv, "arduino_cotrol");
+    ros::NodeHandle nh;
+
+    ros::Subscriber sub[6];
     sub[0] = nh.subscribe("/twist_cmd", 1, twistCMDCallback);
     sub[1] = nh.subscribe("/mode_cmd", 1, modeCMDCallback);
     sub[2] = nh.subscribe("/gear_cmd", 1, gearCMDCallback);
@@ -73,25 +84,25 @@ int main(int argc, char **argv) {
     sub[4] = nh.subscribe("/steer_cmd", 1, steerCMDCallback);
     sub[5] = nh.subscribe("/brake_cmd", 1, brakeCMDCallback);
 
-	pthread_t thread_writer;
+    pthread_t thread_writer;
     pthread_t thread_reader;
 
-	// Create serial port object and open serial port
+    // Create serial port object and open serial port
     SerialPort serialPort("/dev/ttyACM0", BaudRate::B_115200, NumDataBits::EIGHT, Parity::NONE, NumStopBits::ONE);
-    serialPort.SetTimeout(-1); 
-	serialPort.Open();
+    serialPort.SetTimeout(-1);
+    serialPort.Open();
 
-	if (pthread_create(&thread_writer, NULL, writer_handler, &serialPort)) {
-		perror("could not create thread for writer_handler");
-		return -1;
-	}
+    if (pthread_create(&thread_writer, NULL, writer_handler, &serialPort)) {
+        perror("could not create thread for writer_handler");
+        return -1;
+    }
 
-	if (pthread_create(&thread_reader, NULL, reader_handler, &serialPort)) {
-		perror("could not create thread for reader_handler");
-		return -1;
-	}
-	
-	if (pthread_detach(thread_writer) != 0) {
+    if (pthread_create(&thread_reader, NULL, reader_handler, &serialPort)) {
+        perror("could not create thread for reader_handler");
+        return -1;
+    }
+
+    if (pthread_detach(thread_writer) != 0) {
         std::perror("pthread_detach");
         std::exit(1);
     }
@@ -101,13 +112,10 @@ int main(int argc, char **argv) {
         std::exit(1);
     }
 
-	ros::AsyncSpinner spinner(4);  // Use 4 threads
+    ros::AsyncSpinner spinner(4);  // Use 4 threads
     spinner.start();
+    ros::waitForShutdown();
 
-    while (!willExit)
-        ros::waitForShutdown();
-
-	serialPort.Close();
-	return 0;
+    serialPort.Close();
+    return 0;
 }
-
