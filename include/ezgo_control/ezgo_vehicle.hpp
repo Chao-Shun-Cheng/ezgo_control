@@ -36,7 +36,7 @@ typedef struct vehicle_info {
     int brake;
     float steering_angle;
     float velocity;
-    bool control_mode;  // 1 : autonomous mode, 0 : manual mode
+    bool control_mode;  // 0 : manual mode, 1 : autonomous mode
     bool shift;         // 0 : Forward, 1 : Reverse
     bool light;         // 0 : OFF, 1 : ON
 } vehicle_info_t;
@@ -69,16 +69,18 @@ void cmd_reset()
 }
 
 void modeCMDCallback(const tablet_socket_msgs::mode_cmd &mode)
-{
+{   
     if (mode.mode == -1 || mode.mode == 0) {
         cmd_reset();
     }
     vehicle_cmd.modeValue = mode.mode;
+    std::cout << "In modeCMDCallback, mode = " << vehicle_cmd.modeValue << std::endl;
 }
 
 void gearCMDCallback(const tablet_socket_msgs::gear_cmd &gear)
 {
     vehicle_cmd.shift = gear.gear;
+    std::cout << "In gearCMDCallback, mode = " <<  vehicle_cmd.shift << std::endl;
 }
 
 void twistCMDCallback(const geometry_msgs::TwistStamped &msg)
@@ -119,6 +121,7 @@ void showVehicleInfo()
         std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
         std::cout << "Brake : " << vehicle_info.brake << std::endl;
         std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
+        std::cout << "Light :" << vehicle_info.light << std::endl;
     }
     if (vehicle_info.light == ON)
         std::cout << "Light : ON" << std::endl;

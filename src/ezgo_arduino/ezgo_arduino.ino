@@ -36,7 +36,7 @@
  *      light : 0 : off, 1 : on
  * distance --> distance during moter running a cycle
  */
-int mode = 0;
+byte mode = 0;
 volatile float vel = 0;
 float distance = diameter * pi / gear_ratio * 1000 * 3.6;
 double previousTime = 0;
@@ -72,7 +72,7 @@ void getData()
     if (Serial.readBytes(reader_buf, 3) == 3) {
         dac.writeA(((float) reader_buf[0]) / 255.0 * 5.0);
         dac.writeB(((float) reader_buf[1]) / 255.0 * 5.0);
-        if (reader_buf[2] & 0x1) {
+        if (reader_buf[2] & 0x01) {
             digitalWrite(directPin, HIGH);
         } else {
             digitalWrite(directPin, LOW);
@@ -86,8 +86,9 @@ void showInfo()
     writer_buf[0] = reader_buf[0];
     writer_buf[1] = reader_buf[1];
 
-    writer_buf[2] = (mode & 0x1) | (reader_buf[2] & 0x4);
-
+    writer_buf[2] = (mode & 0x01) | ((reader_buf[2] << 2) & 0x04);
+    // light signal test
+    // writer_buf[2] = (mode & 0x01) | ((reader_buf[2] << 2) & 0x04) | ((reader_buf[2] << 1) & 0x02); 
     int current_vel = vel * 1000;
     writer_buf[3] = (current_vel & 0xff00) >> 8;
     writer_buf[4] = current_vel & 0xff;
