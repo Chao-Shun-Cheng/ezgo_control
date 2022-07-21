@@ -15,20 +15,28 @@ static void *writer_handler(void *args)
 	cmd_reset();
 	
     while (ros::ok() && !willExit) {
+        ros::spinOnce();
         switch (vehicle_cmd.modeValue) {
         case 0:
+            // std::cout << "In case 0.\n" << std::endl;
             cmd_reset();
             break;
         case 1:  // autonomous mode
+            std::cout << "In case 1.\n" << std::endl;
             cmd_reset();
             break;
         case 2:  // UI direct control
+            std::cout << "In case 2.\n" << std::endl;
             std::vector<uint8_t> data;
             data.push_back((uint8_t) vehicle_cmd.accel_stroke);
             data.push_back((uint8_t) vehicle_cmd.brake_stroke);
             data.push_back((uint8_t) vehicle_cmd.shift);
             pthread_mutex_lock(&mutex);
             serialPort->WriteBinary(data);
+            for (int i = 0; i < data.size(); i++){
+                std::cout << "data[" << i << "]: " << unsigned(data[i]) << ", ";
+            }
+            std::cout<< std::endl;
             pthread_mutex_unlock(&mutex);
             break;
         }
@@ -47,11 +55,12 @@ static void *reader_handler(void *args)
         serialPort->Read(readData);
         pthread_mutex_unlock(&mutex);
         if (readData.size() == 5) {
+            std::cout << "readData[2]: "<< int(readData[2]) << std::endl;
             vehicle_info.throttle = readData[0];
             vehicle_info.brake = readData[1];
-            vehicle_info.control_mode = (bool) readData[2] & 0x1;
-            vehicle_info.light = (bool) readData[2] & 0x2;
-            vehicle_info.shift = (bool) readData[2] & 0x4;
+            vehicle_info.control_mode = (uint8_t) readData[2] & 0x01;
+            vehicle_info.light = (uint8_t) readData[2] & 0x02;
+            vehicle_info.shift = (uint8_t) readData[2] & 0x04;
             uint16_t vel = 0;
             vel = (((uint16_t) readData[3]) << 8) & 0xFF00;
             vel |= ((uint16_t) readData[4]) & 0xFF;
@@ -73,7 +82,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ros::init(argc, argv, "arduino_cotrol");
+    ros::init(argc, argv, "arduino_control");
     ros::NodeHandle nh;
 
     ros::Subscriber sub[6];
