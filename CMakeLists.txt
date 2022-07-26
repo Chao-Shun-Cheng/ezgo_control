@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(ezgo_control)
+project(ezgo_arduino)
 
 find_package(catkin REQUIRED COMPONENTS
   autoware_msgs

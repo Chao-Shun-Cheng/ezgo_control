@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>ezgo_control</name>
+  <name>ezgo_arduino</name>
   <version>0.0.0</version>
   <description>The ezgo_control package</description>
   <maintainer email="chao.shun.cheng.tw@gmail.com">Chao Shun Cheng</maintainer>

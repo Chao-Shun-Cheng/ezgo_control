@@ -91,7 +91,7 @@ void showInfo()
     // writer_buf[2] = (mode & 0x01) | ((reader_buf[2] << 2) & 0x04) | ((reader_buf[2] << 1) & 0x02); 
     int current_vel = vel * 1000;
     writer_buf[3] = (current_vel & 0xff00) >> 8;
-    writer_buf[4] = current_vel & 0xff;
+    writer_buf[4] = current_vel & 0x00ff;
     Serial.write(writer_buf, 5);
     return;
 }

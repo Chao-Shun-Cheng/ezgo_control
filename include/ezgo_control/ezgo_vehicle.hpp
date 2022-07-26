@@ -121,7 +121,6 @@ void showVehicleInfo()
         std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
         std::cout << "Brake : " << vehicle_info.brake << std::endl;
         std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
-        std::cout << "Light :" << vehicle_info.light << std::endl;
     }
     if (vehicle_info.light == ON)
         std::cout << "Light : ON" << std::endl;
