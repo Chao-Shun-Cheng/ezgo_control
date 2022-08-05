@@ -68,6 +68,19 @@ void cmd_reset()
     vehicle_cmd.light = 0;
 }
 
+bool update_cmd(vehicle_cmd_t& prev_vehicle_cmd) 
+{
+    if (vehicle_cmd.linear_x != prev_vehicle_cmd.linear_x) return true;
+    if (vehicle_cmd.angular_z != prev_vehicle_cmd.angular_z) return true;
+    if (vehicle_cmd.modeValue != prev_vehicle_cmd.modeValue) return true;
+    if (vehicle_cmd.shift != prev_vehicle_cmd.shift) return true;
+    if (vehicle_cmd.accel_stroke != prev_vehicle_cmd.accel_stroke) return true;
+    if (vehicle_cmd.brake_stroke != prev_vehicle_cmd.brake_stroke) return true;
+    if (vehicle_cmd.steering_angle != prev_vehicle_cmd.steering_angle) return true;
+    if (vehicle_cmd.light != prev_vehicle_cmd.light) return true;
+    return false;
+}
+
 void modeCMDCallback(const tablet_socket_msgs::mode_cmd &mode)
 {
     if (mode.mode == -1 || mode.mode == 0) {

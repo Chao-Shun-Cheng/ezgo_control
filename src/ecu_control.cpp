@@ -4,6 +4,9 @@
 #define CAN_CHANNEL 0
 #define CAN_BITRATE BAUD_500K
 #define CAN_INFO_READ_TIMEOUT_INTERVAL 2
+#define CAN_WRITE_ID 0x040
+#define CAN_WRITE_DLC 6
+#define CAN_READ_ID 0x060
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -21,8 +24,19 @@ static void checkCAN(const char *id, canStatus stat)
     }
 }
 
-canStatus Kvaser_canbus_write(long id, char msg[], int len)
+canStatus Kvaser_canbus_write()
 {
+    static char msg[6];
+    int16_t int16_angle = (int16_t) vehicle_cmd.steering_angle;
+    msg[0] = vehicle_cmd.brake_stroke;
+    msg[1] = vehicle_cmd.accel_stroke;
+    msg[4] = vehicle_cmd.shift;
+    msg[5] = vehicle_cmd.light;
+    msg[5] = 0x04;
+    // Byte order: Big-endian
+    msg[2] = (int16_angle >> 8) & 0x00ff;
+    msg[3] = int16_angle & 0x00ff;
+
     static canHandle hnd = -1;
     canStatus stat;
 
@@ -39,8 +53,10 @@ canStatus Kvaser_canbus_write(long id, char msg[], int len)
         canBusOn(hnd);
     }
 
-    stat = canWrite(hnd, id, msg, len, CAN_CHANNEL);
+    stat = canWrite(hnd, CAN_WRITE_ID, msg, CAN_WRITE_DLC, CAN_CHANNEL);
+    checkCAN("canWrite", stat);
     stat = canWriteSync(hnd, 25);
+    checkCAN("canWrite", stat);
     return stat;
 }
 
@@ -48,22 +64,33 @@ static void *CAN_Info_Sender(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread.\n" << RESET << std::endl;
     std::cout << GREEN << "[ezgo_control::CAN_Info_Sender] can open done." << RESET << std::endl;
-
+    
+    vehicle_cmd_t prev_vehicle_cmd;
+    ros::Rate rate(50);
     cmd_reset();
     
     while (ros::ok() && !willExit) { // TODO
-        switch (vehicle_cmd.modeValue) {
-        case 0:
-            cmd_reset();
-            break;
-        case 1:  // autonomous mode
-            cmd_reset();
-            break;
-        case 2:  // UI direct control
-            cmd_reset();
-            break;
-        }
+        ros::spinOnce();
+        if (update_cmd(prev_vehicle_cmd)) {
+            switch (vehicle_cmd.modeValue) {
+            case 0:
+                cmd_reset();
+                break;
+            case 1:  // autonomous mode
+                vehicle_control();
+                Kvaser_canbus_write();
+                cmd_reset();
+                break;
+            case 2:  // UI direct control
+                Kvaser_canbus_write();
+                cmd_reset();
+                break;
+            }
+            prev_vehicle_cmd = vehicle_cmd;
+        } 
+        rate.sleep();
     }
+    
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Sender thread.\n" << RESET << std::endl;
     return nullptr;
 }
@@ -143,9 +170,9 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
-    ros::AsyncSpinner spinner(4);  // Use 4 threads
-    spinner.start();
-    ros::waitForShutdown();
+    // ros::AsyncSpinner spinner(4);  // Use 4 threads
+    // spinner.start();
+    // ros::waitForShutdown();
 
     return 0;
 }
