@@ -6,7 +6,8 @@
 #define CAN_INFO_READ_TIMEOUT_INTERVAL 2
 #define CAN_WRITE_ID 0x040
 #define CAN_WRITE_DLC 6
-#define CAN_READ_ID 0x060
+#define CAN_READ_ID1 0x060
+#define CAN_READ_ID2 0x061
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -47,7 +48,6 @@ canStatus Kvaser_canbus_write()
             checkCAN("canOpenChannel", (canStatus) hnd);
             return canERR_INVHANDLE;
         }
-
         canSetBusParams(hnd, CAN_BITRATE, 0, 0, 0, 0, 0);
         canSetBusOutputControl(hnd, canDRIVER_NORMAL);
         canBusOn(hnd);
@@ -62,7 +62,7 @@ canStatus Kvaser_canbus_write()
 
 static void *CAN_Info_Sender(void *args)
 {
-    std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread.\n" << RESET << std::endl;
+    std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
     std::cout << GREEN << "[ezgo_control::CAN_Info_Sender] can open done." << RESET << std::endl;
     
     vehicle_cmd_t prev_vehicle_cmd;
@@ -79,11 +79,9 @@ static void *CAN_Info_Sender(void *args)
             case 1:  // autonomous mode
                 vehicle_control();
                 Kvaser_canbus_write();
-                cmd_reset();
                 break;
             case 2:  // UI direct control
                 Kvaser_canbus_write();
-                cmd_reset();
                 break;
             }
             prev_vehicle_cmd = vehicle_cmd;
@@ -91,13 +89,13 @@ static void *CAN_Info_Sender(void *args)
         rate.sleep();
     }
     
-    std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Sender thread.\n" << RESET << std::endl;
+    std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
     return nullptr;
 }
 
 static void *CAN_Info_Receiver(void *args)
 {
-    std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Receiver thread.\n" << RESET << std::endl;
+    std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
     canHandle hnd = -1;
     canStatus stat;
     long id;
@@ -115,16 +113,22 @@ static void *CAN_Info_Receiver(void *args)
     stat = canSetBusParams(hnd, CAN_BITRATE, 0, 0, 0, 0, 0);
     checkCAN("canSetBusParams", stat);
     canBusOn(hnd);
-    std::cout << "can info recv: canOpenChannel " << CAN_CHANNEL << std::endl;
-    std::cout << GREEN << "[ezgo_control::CAN_Info_Receiver] can open done." << RESET << std::endl;
+    std::cout << GREEN << "[ezgo_control::CAN_Info_Receiver] can open done, Channel " << CAN_CHANNEL << RESET << std::endl;
 
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
-            // TODO : Parse Can message.
+            if (id == CAN_READ_ID1 && dlc == 6) {
+                vehicle_info.brake = msg[0];
+                vehicle_info.throttle = msg[1];
+            } else if (id == CAN_READ_ID2 && dlc == 5) {
+                vehicle_info.control_mode = msg[1];
+                // vehicle_info.velocity = 
+            }
+            showVehicleInfo();
         }
     }
-    std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread.\n" << RESET << std::endl;
+    std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
     return nullptr;
 }
 
@@ -136,7 +140,7 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ros::init(argc, argv, "ecu_cotrol");
+    ros::init(argc, argv, "ecu_control");
     ros::NodeHandle nh;
 
     ros::Subscriber sub[6];
@@ -170,6 +174,7 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
+    pause();
     // ros::AsyncSpinner spinner(4);  // Use 4 threads
     // spinner.start();
     // ros::waitForShutdown();
