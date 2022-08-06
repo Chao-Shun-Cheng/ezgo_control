@@ -118,12 +118,15 @@ static void *CAN_Info_Receiver(void *args)
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
-            if (id == CAN_READ_ID1 && dlc == 6) {
+            if (id == CAN_READ_ID1) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
-            } else if (id == CAN_READ_ID2 && dlc == 5) {
+            } else if (id == CAN_READ_ID2) {
                 vehicle_info.control_mode = msg[1];
-                // vehicle_info.velocity = 
+                uint16_t vel = 0;
+                vel = (((uint16_t) msg[2]) << 8) & 0xFF00;  // speed high byte
+                vel += msg[3];                              // speed low byte
+                vehicle_info.velocity = (float) vel;
             }
             showVehicleInfo();
         }

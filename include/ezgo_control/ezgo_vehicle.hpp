@@ -124,15 +124,15 @@ void showVehicleInfo()
 {
     if (vehicle_info.control_mode == MANUAL) {
         std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
-        std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     }
 
     else if (vehicle_info.control_mode == AUTONOMOUS) {
         std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
-        std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
-        std::cout << "Brake : " << vehicle_info.brake << std::endl;
-        std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     }
+    
+    std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
+    std::cout << "Brake : " << vehicle_info.brake << std::endl;
+    std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
     if (vehicle_info.light == ON)
         std::cout << "Light : ON" << std::endl;
     else
