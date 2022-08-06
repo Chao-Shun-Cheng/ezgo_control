@@ -50,7 +50,7 @@ static void *reader_handler(void *args)
             vehicle_info.throttle = readData[0];
             vehicle_info.brake = readData[1];
             vehicle_info.control_mode = (bool) readData[2] & 0x1;
-            vehicle_info.light = (bool) readData[2] & 0x2;
+            vehicle_info.headlight = (bool) readData[2] & 0x2;
             vehicle_info.shift = (bool) readData[2] & 0x4;
             uint16_t vel = 0;
             vel = (((uint16_t) readData[3]) << 8) & 0xFF00;

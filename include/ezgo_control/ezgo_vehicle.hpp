@@ -25,20 +25,23 @@
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
 
-enum Light { OFF, ON };
+enum HeadLight { OFF = 0, ON = 1 };
 
-enum Shift { FORWARD, REVERSE };
+enum TurningLight { NONE = 0, LEFT = 1, RIGHT = 2, BOTH = 3 };
 
-enum Mode { MANUAL, AUTONOMOUS };
+enum Shift { PARKING = 1, REVERSE = 2, NEUTRAL = 3, DRIVE = 4 };
+
+enum Mode { MANUAL = 1, AUTONOMOUS = 2 };
 
 typedef struct vehicle_info {
     int throttle;
     int brake;
     float steering_angle;
     float velocity;
-    bool control_mode;  // 1 : autonomous mode, 0 : manual mode
-    bool shift;         // 0 : Forward, 1 : Reverse
-    bool light;         // 0 : OFF, 1 : ON
+    int control_mode;  
+    int shift;         
+    int headlight;     
+    int turninglight;
 } vehicle_info_t;
 
 typedef struct vehicle_cmd {
@@ -129,19 +132,56 @@ void showVehicleInfo()
     else if (vehicle_info.control_mode == AUTONOMOUS) {
         std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
     }
-    
+
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
     std::cout << "Brake : " << vehicle_info.brake << std::endl;
     std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
-    if (vehicle_info.light == ON)
-        std::cout << "Light : ON" << std::endl;
-    else
-        std::cout << "Light : OFF" << std::endl;
 
-    if (vehicle_info.shift == FORWARD)
-        std::cout << "Shift : Forward" << std::endl;
-    else
-        std::cout << "Shift : Reverse" << std::endl;
+    switch (vehicle_info.headlight) {
+        case OFF:
+            std::cout << "Head Light : OFF" << std::endl;
+            break;
+        case ON:
+            std::cout << "Head Light : ON" << std::endl;
+            break;
+        default:
+            break;
+    }
+    
+    switch (vehicle_info.turninglight) {
+        case NONE:
+            std::cout << "Turning Light : OFF" << std::endl;
+            break;
+        case LEFT:
+            std::cout << "Turning Light : Left" << std::endl;
+            break;
+        case RIGHT:
+            std::cout << "Turning Light : Right" << std::endl;
+            break;
+        case BOTH:
+            std::cout << "Turning Light : Both" << std::endl;
+            break;
+        default:
+            break;
+    }
+
+    switch (vehicle_info.shift) {
+        case PARKING:
+            std::cout << "Shift : Parking" << std::endl;
+            break;
+        case REVERSE:
+            std::cout << "Shift : Reverse" << std::endl;
+            break;
+        case NEUTRAL:
+            std::cout << "Shift : Neutral" << std::endl;
+            break;
+        case DRIVE:
+            std::cout << "Shift : Drive" << std::endl;
+            break;
+        default:
+            break;
+    }
+    
     return;
 }
 

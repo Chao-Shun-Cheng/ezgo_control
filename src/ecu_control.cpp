@@ -2,12 +2,14 @@
 #include <ezgo_control/ezgo_vehicle.hpp>
 
 #define CAN_CHANNEL 0
-#define CAN_BITRATE BAUD_500K
+#define CAN_BITRATE BAUD_250K
 #define CAN_INFO_READ_TIMEOUT_INTERVAL 2
 #define CAN_WRITE_ID 0x040
 #define CAN_WRITE_DLC 6
 #define CAN_READ_ID1 0x060
 #define CAN_READ_ID2 0x061
+
+#define STEERING_OFFSET 0x400
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -121,12 +123,13 @@ static void *CAN_Info_Receiver(void *args)
             if (id == CAN_READ_ID1) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
+                vehicle_info.headlight = msg[2];
+                vehicle_info.shift = msg[3];
+                vehicle_info.steering_angle = (float) ((int16_t)(((msg[4] << 8) & 0xff00) + msg[5]) - STEERING_OFFSET);
+                vehicle_info.turninglight = msg[6];
             } else if (id == CAN_READ_ID2) {
-                vehicle_info.control_mode = msg[1];
-                uint16_t vel = 0;
-                vel = (((uint16_t) msg[2]) << 8) & 0xFF00;  // speed high byte
-                vel += msg[3];                              // speed low byte
-                vehicle_info.velocity = (float) vel;
+                vehicle_info.control_mode = msg[0];
+                vehicle_info.velocity = (float) ((int16_t)(((msg[3] << 8) & 0xff00) + msg[4]));
             }
             showVehicleInfo();
         }
