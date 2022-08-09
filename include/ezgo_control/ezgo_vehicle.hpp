@@ -29,9 +29,9 @@ enum HeadLight { OFF = 0, ON = 1 };
 
 enum TurningLight { NONE = 0, LEFT = 1, RIGHT = 2, BOTH = 3 };
 
-enum Shift { PARKING = 1, REVERSE = 2, NEUTRAL = 3, DRIVE = 4 };
+enum Shift { PARKING = 0, REVERSE = 1, NEUTRAL = 2, DRIVE = 3 };
 
-enum Mode { MANUAL = 1, AUTONOMOUS = 2 };
+enum Mode { MANUAL = 0, AUTONOMOUS = 1, OVERRIDE = 2, CARINIT = 3 };
 
 typedef struct vehicle_info {
     int throttle;
@@ -52,7 +52,8 @@ typedef struct vehicle_cmd {
     int accel_stroke;
     int brake_stroke;
     int steering_angle;
-    char light;
+    int headlight;
+    int turninglight;
 } vehicle_cmd_t;
 
 extern vehicle_cmd_t vehicle_cmd;
@@ -68,7 +69,8 @@ void cmd_reset()
     vehicle_cmd.accel_stroke = 0;
     vehicle_cmd.brake_stroke = 0;
     vehicle_cmd.steering_angle = 0;
-    vehicle_cmd.light = 0;
+    vehicle_cmd.headlight = 0;
+    vehicle_cmd.turninglight = 0;
 }
 
 bool update_cmd(vehicle_cmd_t& prev_vehicle_cmd) 
@@ -80,7 +82,8 @@ bool update_cmd(vehicle_cmd_t& prev_vehicle_cmd)
     if (vehicle_cmd.accel_stroke != prev_vehicle_cmd.accel_stroke) return true;
     if (vehicle_cmd.brake_stroke != prev_vehicle_cmd.brake_stroke) return true;
     if (vehicle_cmd.steering_angle != prev_vehicle_cmd.steering_angle) return true;
-    if (vehicle_cmd.light != prev_vehicle_cmd.light) return true;
+    if (vehicle_cmd.headlight != prev_vehicle_cmd.headlight) return true;
+    if (vehicle_cmd.turninglight != prev_vehicle_cmd.turninglight) return true;
     return false;
 }
 
@@ -125,12 +128,38 @@ void vehicle_control()
 
 void showVehicleInfo()
 {
-    if (vehicle_info.control_mode == MANUAL) {
-        std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
+    switch (vehicle_info.control_mode) {
+        case MANUAL:
+            std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
+            break;
+        case AUTONOMOUS:
+            std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
+            break;
+        case OVERRIDE:
+            std::cout << BLUE << "------ override mode ------" << RESET << std::endl;
+            break;
+        case CARINIT:
+            std::cout << RED << "------ car init mode ------" << RESET << std::endl;
+            break;
+        default:
+            break;
     }
 
-    else if (vehicle_info.control_mode == AUTONOMOUS) {
-        std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
+    switch (vehicle_info.shift) {
+        case PARKING:
+            std::cout << "Shift : Parking" << std::endl;
+            break;
+        case REVERSE:
+            std::cout << "Shift : Reverse" << std::endl;
+            break;
+        case NEUTRAL:
+            std::cout << "Shift : Neutral" << std::endl;
+            break;
+        case DRIVE:
+            std::cout << "Shift : Drive" << std::endl;
+            break;
+        default:
+            break;
     }
 
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
@@ -160,23 +189,6 @@ void showVehicleInfo()
             break;
         case BOTH:
             std::cout << "Turning Light : Both" << std::endl;
-            break;
-        default:
-            break;
-    }
-
-    switch (vehicle_info.shift) {
-        case PARKING:
-            std::cout << "Shift : Parking" << std::endl;
-            break;
-        case REVERSE:
-            std::cout << "Shift : Reverse" << std::endl;
-            break;
-        case NEUTRAL:
-            std::cout << "Shift : Neutral" << std::endl;
-            break;
-        case DRIVE:
-            std::cout << "Shift : Drive" << std::endl;
             break;
         default:
             break;

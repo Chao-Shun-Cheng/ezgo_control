@@ -5,7 +5,7 @@
 #define CAN_BITRATE BAUD_250K
 #define CAN_INFO_READ_TIMEOUT_INTERVAL 2
 #define CAN_WRITE_ID 0x040
-#define CAN_WRITE_DLC 6
+#define CAN_WRITE_DLC 7
 #define CAN_READ_ID1 0x060
 #define CAN_READ_ID2 0x061
 
@@ -29,13 +29,14 @@ static void checkCAN(const char *id, canStatus stat)
 
 canStatus Kvaser_canbus_write()
 {
-    static char msg[6];
+    static char msg[CAN_WRITE_DLC];
     int16_t int16_angle = (int16_t) vehicle_cmd.steering_angle;
     msg[0] = vehicle_cmd.brake_stroke;
     msg[1] = vehicle_cmd.accel_stroke;
     msg[4] = vehicle_cmd.shift;
-    msg[5] = vehicle_cmd.light;
-    msg[5] = 0x04;
+    msg[5] = vehicle_cmd.turninglight;
+    msg[6] = vehicle_cmd.headlight;
+    
     // Byte order: Big-endian
     msg[2] = (int16_angle >> 8) & 0x00ff;
     msg[3] = int16_angle & 0x00ff;
@@ -120,16 +121,17 @@ static void *CAN_Info_Receiver(void *args)
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
-            if (id == CAN_READ_ID1) {
+            if (id == CAN_READ_ID1 && dlc == 7) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
-                vehicle_info.headlight = msg[2];
-                vehicle_info.shift = msg[3];
-                vehicle_info.steering_angle = (float) ((int16_t)(((msg[4] << 8) & 0xff00) + msg[5]) - STEERING_OFFSET);
-                vehicle_info.turninglight = msg[6];
-            } else if (id == CAN_READ_ID2) {
+                vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - STEERING_OFFSET);
+                vehicle_info.shift = msg[4];
+                vehicle_info.turninglight = msg[5];
+                vehicle_info.headlight = msg[6];
+            } else if (id == CAN_READ_ID2 && dlc == 5) {
                 vehicle_info.control_mode = msg[0];
-                vehicle_info.velocity = (float) ((int16_t)(((msg[3] << 8) & 0xff00) + msg[4]));
+                vehicle_info.velocity = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
+                vehicle_info.velocity /= 1000.0;
             }
             showVehicleInfo();
         }
@@ -180,10 +182,7 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
-    pause();
-    // ros::AsyncSpinner spinner(4);  // Use 4 threads
-    // spinner.start();
-    // ros::waitForShutdown();
+    ros::waitForShutdown();
 
     return 0;
 }
