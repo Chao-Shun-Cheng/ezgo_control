@@ -12,8 +12,8 @@ static void *writer_handler(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_vehicle_control Writer thread.\n" << RESET << std::endl;
     SerialPort *serialPort = (SerialPort *) args;
-	cmd_reset();
-	
+    cmd_reset();
+
     while (ros::ok() && !willExit) {
         switch (vehicle_cmd.modeValue) {
         case 0:

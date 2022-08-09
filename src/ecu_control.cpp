@@ -9,7 +9,7 @@
 #define CAN_READ_ID1 0x060
 #define CAN_READ_ID2 0x061
 
-#define STEERING_OFFSET 0x400
+
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -36,7 +36,7 @@ canStatus Kvaser_canbus_write()
     msg[4] = vehicle_cmd.shift;
     msg[5] = vehicle_cmd.turninglight;
     msg[6] = vehicle_cmd.headlight;
-    
+
     // Byte order: Big-endian
     msg[2] = (int16_angle >> 8) & 0x00ff;
     msg[3] = int16_angle & 0x00ff;
@@ -67,12 +67,12 @@ static void *CAN_Info_Sender(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
     std::cout << GREEN << "[ezgo_control::CAN_Info_Sender] can open done." << RESET << std::endl;
-    
+
     vehicle_cmd_t prev_vehicle_cmd;
     ros::Rate rate(50);
     cmd_reset();
-    
-    while (ros::ok() && !willExit) { // TODO
+
+    while (ros::ok() && !willExit) {  // TODO
         ros::spinOnce();
         if (update_cmd(prev_vehicle_cmd)) {
             switch (vehicle_cmd.modeValue) {
@@ -81,17 +81,19 @@ static void *CAN_Info_Sender(void *args)
                 break;
             case 1:  // autonomous mode
                 vehicle_control();
+                checkRange();
                 Kvaser_canbus_write();
                 break;
             case 2:  // UI direct control
+                checkRange();
                 Kvaser_canbus_write();
                 break;
             }
             prev_vehicle_cmd = vehicle_cmd;
-        } 
+        }
         rate.sleep();
     }
-    
+
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
     return nullptr;
 }

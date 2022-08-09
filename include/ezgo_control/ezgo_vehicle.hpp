@@ -1,3 +1,4 @@
+#include <math.h>
 #include <pthread.h>
 #include <ros/ros.h>
 #include <signal.h>
@@ -5,7 +6,6 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <math.h>
 
 #include <autoware_msgs/AccelCmd.h>
 #include <autoware_msgs/BrakeCmd.h>
@@ -14,6 +14,9 @@
 #include <std_msgs/Float32.h>
 #include <tablet_socket_msgs/gear_cmd.h>
 #include <tablet_socket_msgs/mode_cmd.h>
+
+#define STEERING_OFFSET 0x400
+#define BRAKE_OFFSET 26
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -38,9 +41,9 @@ typedef struct vehicle_info {
     int brake;
     float steering_angle;
     float velocity;
-    int control_mode;  
-    int shift;         
-    int headlight;     
+    int control_mode;
+    int shift;
+    int headlight;
     int turninglight;
 } vehicle_info_t;
 
@@ -73,17 +76,26 @@ void cmd_reset()
     vehicle_cmd.turninglight = 0;
 }
 
-bool update_cmd(vehicle_cmd_t& prev_vehicle_cmd) 
+bool update_cmd(vehicle_cmd_t &prev_vehicle_cmd)
 {
-    if (vehicle_cmd.linear_x != prev_vehicle_cmd.linear_x) return true;
-    if (vehicle_cmd.angular_z != prev_vehicle_cmd.angular_z) return true;
-    if (vehicle_cmd.modeValue != prev_vehicle_cmd.modeValue) return true;
-    if (vehicle_cmd.shift != prev_vehicle_cmd.shift) return true;
-    if (vehicle_cmd.accel_stroke != prev_vehicle_cmd.accel_stroke) return true;
-    if (vehicle_cmd.brake_stroke != prev_vehicle_cmd.brake_stroke) return true;
-    if (vehicle_cmd.steering_angle != prev_vehicle_cmd.steering_angle) return true;
-    if (vehicle_cmd.headlight != prev_vehicle_cmd.headlight) return true;
-    if (vehicle_cmd.turninglight != prev_vehicle_cmd.turninglight) return true;
+    if (vehicle_cmd.linear_x != prev_vehicle_cmd.linear_x)
+        return true;
+    if (vehicle_cmd.angular_z != prev_vehicle_cmd.angular_z)
+        return true;
+    if (vehicle_cmd.modeValue != prev_vehicle_cmd.modeValue)
+        return true;
+    if (vehicle_cmd.shift != prev_vehicle_cmd.shift)
+        return true;
+    if (vehicle_cmd.accel_stroke != prev_vehicle_cmd.accel_stroke)
+        return true;
+    if (vehicle_cmd.brake_stroke != prev_vehicle_cmd.brake_stroke)
+        return true;
+    if (vehicle_cmd.steering_angle != prev_vehicle_cmd.steering_angle)
+        return true;
+    if (vehicle_cmd.headlight != prev_vehicle_cmd.headlight)
+        return true;
+    if (vehicle_cmd.turninglight != prev_vehicle_cmd.turninglight)
+        return true;
     return false;
 }
 
@@ -121,45 +133,78 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
     vehicle_cmd.brake_stroke = brake.brake;
 }
 
-void vehicle_control()
+void vehicle_control() {}
+
+bool ChangeShift() {}
+
+void SteeringControl() {}
+
+void PedalControl() {}
+
+void checkRange() 
 {
-    // TODO
+    vehicle_cmd.steering_angle = vehicle_cmd.steering_angle + STEERING_OFFSET;
+    if (vehicle_cmd.steering_angle < 0) vehicle_cmd.steering_angle = 0;
+    else if (vehicle_cmd.steering_angle > 1440) vehicle_cmd.steering_angle = 1440;
+
+    vehicle_cmd.brake_stroke = vehicle_cmd.brake_stroke + BRAKE_OFFSET;
+    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
+    else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
+
+    if (vehicle_cmd.accel_stroke < 0) vehicle_cmd.accel_stroke = 0;
+    else if (vehicle_cmd.accel_stroke > 255) vehicle_cmd.accel_stroke = 255;
+
+    if (vehicle_cmd.shift < 0 || vehicle_cmd.shift > 3) {
+        vehicle_cmd.shift = 0;
+        syd::cout << RED << "Shift is out of range." << RESET << std::endl;
+    }
+
+    if (vehicle_cmd.turninglight < 0 || vehicle_cmd.turninglight > 3) {
+        vehicle_cmd.turninglight = 0;
+        syd::cout << RED << "Turning light is out of range." << RESET << std::endl;
+    }
+
+    if (vehicle_cmd.headlight < 0 || vehicle_cmd.headlight > 3) {
+        vehicle_cmd.headlight = 0;
+        syd::cout << RED << "Head light is out of range." << RESET << std::endl;
+    }
+    return;
 }
 
 void showVehicleInfo()
 {
     switch (vehicle_info.control_mode) {
-        case MANUAL:
-            std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
-            break;
-        case AUTONOMOUS:
-            std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
-            break;
-        case OVERRIDE:
-            std::cout << BLUE << "------ override mode ------" << RESET << std::endl;
-            break;
-        case CARINIT:
-            std::cout << RED << "------ car init mode ------" << RESET << std::endl;
-            break;
-        default:
-            break;
+    case MANUAL:
+        std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
+        break;
+    case AUTONOMOUS:
+        std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
+        break;
+    case OVERRIDE:
+        std::cout << BLUE << "------ override mode ------" << RESET << std::endl;
+        break;
+    case CARINIT:
+        std::cout << RED << "------ car init mode ------" << RESET << std::endl;
+        break;
+    default:
+        break;
     }
 
     switch (vehicle_info.shift) {
-        case PARKING:
-            std::cout << "Shift : Parking" << std::endl;
-            break;
-        case REVERSE:
-            std::cout << "Shift : Reverse" << std::endl;
-            break;
-        case NEUTRAL:
-            std::cout << "Shift : Neutral" << std::endl;
-            break;
-        case DRIVE:
-            std::cout << "Shift : Drive" << std::endl;
-            break;
-        default:
-            break;
+    case PARKING:
+        std::cout << "Shift : Parking" << std::endl;
+        break;
+    case REVERSE:
+        std::cout << "Shift : Reverse" << std::endl;
+        break;
+    case NEUTRAL:
+        std::cout << "Shift : Neutral" << std::endl;
+        break;
+    case DRIVE:
+        std::cout << "Shift : Drive" << std::endl;
+        break;
+    default:
+        break;
     }
 
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
@@ -167,33 +212,33 @@ void showVehicleInfo()
     std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
 
     switch (vehicle_info.headlight) {
-        case OFF:
-            std::cout << "Head Light : OFF" << std::endl;
-            break;
-        case ON:
-            std::cout << "Head Light : ON" << std::endl;
-            break;
-        default:
-            break;
+    case OFF:
+        std::cout << "Head Light : OFF" << std::endl;
+        break;
+    case ON:
+        std::cout << "Head Light : ON" << std::endl;
+        break;
+    default:
+        break;
     }
-    
+
     switch (vehicle_info.turninglight) {
-        case NONE:
-            std::cout << "Turning Light : OFF" << std::endl;
-            break;
-        case LEFT:
-            std::cout << "Turning Light : Left" << std::endl;
-            break;
-        case RIGHT:
-            std::cout << "Turning Light : Right" << std::endl;
-            break;
-        case BOTH:
-            std::cout << "Turning Light : Both" << std::endl;
-            break;
-        default:
-            break;
+    case NONE:
+        std::cout << "Turning Light : OFF" << std::endl;
+        break;
+    case LEFT:
+        std::cout << "Turning Light : Left" << std::endl;
+        break;
+    case RIGHT:
+        std::cout << "Turning Light : Right" << std::endl;
+        break;
+    case BOTH:
+        std::cout << "Turning Light : Both" << std::endl;
+        break;
+    default:
+        break;
     }
-    
+
     return;
 }
 
