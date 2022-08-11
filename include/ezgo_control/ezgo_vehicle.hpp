@@ -148,7 +148,7 @@ void checkRange()
     else if (vehicle_cmd.steering_angle > 1440) vehicle_cmd.steering_angle = 1440;
 
     vehicle_cmd.brake_stroke = vehicle_cmd.brake_stroke + BRAKE_OFFSET;
-    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
+    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = BRAKE_OFFSET;
     else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
 
     if (vehicle_cmd.accel_stroke < 0) vehicle_cmd.accel_stroke = 0;
@@ -156,17 +156,17 @@ void checkRange()
 
     if (vehicle_cmd.shift < 0 || vehicle_cmd.shift > 3) {
         vehicle_cmd.shift = 0;
-        syd::cout << RED << "Shift is out of range." << RESET << std::endl;
+        std::cout << RED << "Shift is out of range." << RESET << std::endl;
     }
 
     if (vehicle_cmd.turninglight < 0 || vehicle_cmd.turninglight > 3) {
         vehicle_cmd.turninglight = 0;
-        syd::cout << RED << "Turning light is out of range." << RESET << std::endl;
+        std::cout << RED << "Turning light is out of range." << RESET << std::endl;
     }
 
     if (vehicle_cmd.headlight < 0 || vehicle_cmd.headlight > 3) {
         vehicle_cmd.headlight = 0;
-        syd::cout << RED << "Head light is out of range." << RESET << std::endl;
+        std::cout << RED << "Head light is out of range." << RESET << std::endl;
     }
     return;
 }

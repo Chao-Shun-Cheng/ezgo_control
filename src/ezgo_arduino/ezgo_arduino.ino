@@ -26,6 +26,8 @@
 #define gear_ratio 16.99
 #define REF_POWER 3.34
 #define lightPin 8
+#define RX_LENGTH 7
+#define TX_LENGTH 7
 
 /*
  * mode --> 0 : manual mode, 1 : autonomous mode
@@ -41,9 +43,6 @@ volatile float vel = 0;
 float distance = diameter * pi / gear_ratio * 1000 * 3.6;
 double previousTime = 0;
 DAC8562 dac = DAC8562(SSPin, REF_POWER);
-
-byte writer_buf[5] = {0};
-byte reader_buf[3] = {0};
 
 void setup()
 {
@@ -64,18 +63,30 @@ void loop()
         getData();
     }
     showInfo();
-    delay(100);
+    delay(10);
 }
 
 void getData()
 {
-    if (Serial.readBytes(reader_buf, 3) == 3) {
-        dac.writeA(((float) reader_buf[0]) / 255.0 * 5.0);
-        dac.writeB(((float) reader_buf[1]) / 255.0 * 5.0);
-        if (reader_buf[2] & 0x1) {
-            digitalWrite(directPin, HIGH);
-        } else {
-            digitalWrite(directPin, LOW);
+    static byte reader_buf[RX_LENGTH] = {0};
+    if (Serial.readBytes(reader_buf, RX_LENGTH) == RX_LENGTH) {
+        dac.writeA(((float) reader_buf[1]) / 255.0 * 5.0); // Throttle
+        dac.writeB(((float) reader_buf[0]) / 255.0 * 5.0); // Brake
+        switch (reader_buf[4]) {
+            case 0:
+                digitalWrite(directPin, LOW);
+                break;
+            case 1:
+                digitalWrite(directPin, HIGH);
+                break;
+            case 2:
+                digitalWrite(directPin, LOW);
+                break;
+            case 3:
+                digitalWrite(directPin, LOW);
+                break;
+            default:
+                break;
         }
     }
     return;
@@ -83,15 +94,18 @@ void getData()
 
 void showInfo()
 {
+    static byte writer_buf[TX_LENGTH] = {0};
     writer_buf[0] = reader_buf[0];
     writer_buf[1] = reader_buf[1];
 
-    writer_buf[2] = (mode & 0x1) | (reader_buf[2] & 0x4);
-
     int current_vel = vel * 1000;
-    writer_buf[3] = (current_vel & 0xff00) >> 8;
-    writer_buf[4] = current_vel & 0xff;
-    Serial.write(writer_buf, 5);
+    writer_buf[4] = (current_vel & 0xff00) >> 8;
+    writer_buf[5] = current_vel & 0xff;
+
+    writer_buf[6] = ((mode & 0x1) << 5); // control mode
+    writer_buf[6] |= reader_buf[4];      // shift
+
+    Serial.write(writer_buf, TX_LENGTH);
     return;
 }
 

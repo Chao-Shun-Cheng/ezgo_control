@@ -72,7 +72,7 @@ static void *CAN_Info_Sender(void *args)
     ros::Rate rate(50);
     cmd_reset();
 
-    while (ros::ok() && !willExit) {  // TODO
+    while (ros::ok() && !willExit) { 
         ros::spinOnce();
         if (update_cmd(prev_vehicle_cmd)) {
             switch (vehicle_cmd.modeValue) {

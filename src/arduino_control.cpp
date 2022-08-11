@@ -1,6 +1,8 @@
 #include <ezgo_control/SerialPort.hpp>
 #include <ezgo_control/ezgo_vehicle.hpp>
 
+#define WRITE_LENGTH 7
+#define READ_LENGTH 7
 using namespace mn::CppLinuxSerial;
 
 pthread_mutex_t mutex;
@@ -8,30 +10,55 @@ vehicle_info_t vehicle_info;
 vehicle_cmd_t vehicle_cmd;
 int willExit = 0;
 
+void arduino_serial_write(SerialPort *serialPort)
+{
+    static std::vector<uint8_t> msg(WRITE_LENGTH, 0);
+    int16_t int16_angle = (int16_t) vehicle_cmd.steering_angle;
+    msg[0] = vehicle_cmd.brake_stroke;
+    msg[1] = vehicle_cmd.accel_stroke;
+    msg[4] = vehicle_cmd.shift;
+    msg[5] = vehicle_cmd.turninglight;
+    msg[6] = vehicle_cmd.headlight;
+
+    // Byte order: Big-endian
+    msg[2] = (int16_angle >> 8) & 0x00ff;
+    msg[3] = int16_angle & 0x00ff;
+
+    pthread_mutex_lock(&mutex);
+    serialPort->WriteBinary(msg);
+    pthread_mutex_unlock(&mutex);
+    return;
+}
+
 static void *writer_handler(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_vehicle_control Writer thread.\n" << RESET << std::endl;
     SerialPort *serialPort = (SerialPort *) args;
+
+    vehicle_cmd_t prev_vehicle_cmd;
+    ros::Rate rate(50);
     cmd_reset();
 
     while (ros::ok() && !willExit) {
-        switch (vehicle_cmd.modeValue) {
-        case 0:
-            cmd_reset();
-            break;
-        case 1:  // autonomous mode
-            cmd_reset();
-            break;
-        case 2:  // UI direct control
-            std::vector<uint8_t> data;
-            data.push_back((uint8_t) vehicle_cmd.accel_stroke);
-            data.push_back((uint8_t) vehicle_cmd.brake_stroke);
-            data.push_back((uint8_t) vehicle_cmd.shift);
-            pthread_mutex_lock(&mutex);
-            serialPort->WriteBinary(data);
-            pthread_mutex_unlock(&mutex);
-            break;
+        ros::spinOnce();
+        if (update_cmd(prev_vehicle_cmd)) {
+            switch (vehicle_cmd.modeValue) {
+            case 0:
+                cmd_reset();
+                break;
+            case 1:  // autonomous mode
+                vehicle_control();
+                checkRange();
+                arduino_serial_write(serialPort);
+                break;
+            case 2:  // UI direct control
+                checkRange();
+                arduino_serial_write(serialPort);
+                break;
+            }
+            prev_vehicle_cmd = vehicle_cmd;
         }
+        rate.sleep();
     }
     std::cout << YELLOW << "EXIT ezgo_vehicle_control Writer thread.\n" << RESET << std::endl;
     return nullptr;
@@ -46,16 +73,16 @@ static void *reader_handler(void *args)
         pthread_mutex_lock(&mutex);
         serialPort->Read(readData);
         pthread_mutex_unlock(&mutex);
-        if (readData.size() == 5) {
-            vehicle_info.throttle = readData[0];
-            vehicle_info.brake = readData[1];
-            vehicle_info.control_mode = (bool) readData[2] & 0x1;
-            vehicle_info.headlight = (bool) readData[2] & 0x2;
-            vehicle_info.shift = (bool) readData[2] & 0x4;
-            uint16_t vel = 0;
-            vel = (((uint16_t) readData[3]) << 8) & 0xFF00;
-            vel |= ((uint16_t) readData[4]) & 0xFF;
-            vehicle_info.velocity = ((float) vel) / 1000;
+        if (readData.size() == READ_LENGTH) {
+            vehicle_info.brake = readData[0];
+            vehicle_info.throttle = readData[1];
+            vehicle_info.steering_angle = (float) ((int16_t)(((readData[2] << 8) & 0xff00) + readData[3]) - STEERING_OFFSET);
+            vehicle_info.velocity = (float) ((int16_t)(((readData[4] << 8) & 0xff00) + readData[5]));
+            vehicle_info.velocity /= 1000.0;
+            vehicle_info.shift = readData[6] & 0x03;
+            vehicle_info.turninglight = readData[6] & 0x0c;
+            vehicle_info.headlight = readData[6] & 0x10;
+            vehicle_info.control_mode = readData[6] & 0x20;
             showVehicleInfo();
         } else {
             std::cout << RED << "Without Receive DATA, Check connect ...." << RESET << std::endl;
@@ -112,10 +139,7 @@ int main(int argc, char **argv)
         std::exit(1);
     }
 
-    ros::AsyncSpinner spinner(4);  // Use 4 threads
-    spinner.start();
     ros::waitForShutdown();
-
     serialPort.Close();
     return 0;
 }
