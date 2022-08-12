@@ -17,6 +17,13 @@
 
 #define STEERING_OFFSET 0x400
 #define BRAKE_OFFSET 26
+#define KMH_TO_MS 3.6 // [km/hr] -> [m/s]
+#define CHANGE_SHIFT_TIME 3 // [sec]
+#define STEERING_ANGLE_MAX 30
+#define WHEEL_ANGLE_MAX 30
+#define WHEEL_BASE 30
+#define WHEEL_TO_STEERING (STEERING_ANGLE_MAX / WHEEL_ANGLE_MAX)
+
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -133,13 +140,53 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
     vehicle_cmd.brake_stroke = brake.brake;
 }
 
-void vehicle_control() {}
+void vehicle_control() 
+{
+    CheckShift();
+    SteeringControl();
+    PedalControl(fabs(vehicle_cmd.linear_x), vehicle_info.velocity / KMH_TO_MS);
+    return;
+}
 
-bool ChangeShift() {}
+void CheckShift()
+{
+    static bool wait_for_change_shift = false;
+    if (vehicle_info.velocity != 0 && ((vehicle_info.shift == DRIVE && vehicle_cmd.linear_x < 0) || (vehicle_info.shift == REVERSE && vehicle_cmd.linear_x > 0))) {
+        wait_for_change_shift = true;
+        vehicle_cmd.linear_x = vehicle_info.velocity > 1 ? vehicle_info.velocity / 2 : 0;
+    }
+    if (wait_for_change_shift && vehicle_info.velocity == 0) {
+        std::this_thread::sleep_for(std::chrono::seconds(CHANGE_SHIFT_TIME));
+        wait_for_change_shift = false;
+    }
+    if (vehicle_cmd.linear_x < 0)
+        vehicle_cmd.shift = REVERSE;
+    else if (vehicle_cmd.linear_x == 0)
+        vehicle_cmd.shift = PARKING;
+    else    
+        vehicle_cmd.shift = DRIVE;
+    return;
+}
 
-void SteeringControl() {}
+void SteeringControl() 
+{
+    static float pre_cmd_steering_angle = 0.0;
+    if (vehicle_cmd.linear_x < 0.1) {
+        vehicle_cmd.steering_angle = pre_cmd_steering_angle;
+    } else {
+        double phi_angle_pi = (v_cmd.angular_z / v_cmd.linear_x);
+        double wheel_angle_pi = phi_angle_pi * WHEEL_BASE;
+        double wheel_angle = (wheel_angle_pi / M_PI) * 180.0;
+        vehicle_cmd.steering_angle = wheel_angle * WHEEL_TO_STEERING;
+        pre_cmd_steering_angle = vehicle_cmd.steering_angle;
+    }
+    return;
+}
 
-void PedalControl() {}
+void PedalControl(const double cmd_velocity, const double current_velocity) 
+{
+
+}
 
 void checkRange() 
 {
@@ -209,7 +256,7 @@ void showVehicleInfo()
 
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
     std::cout << "Brake : " << vehicle_info.brake << std::endl;
-    std::cout << "Velocity : " << vehicle_info.velocity << std::endl;
+    std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]"<< std::endl;
 
     switch (vehicle_info.headlight) {
     case OFF:
