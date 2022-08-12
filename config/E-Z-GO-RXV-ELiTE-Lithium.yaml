@@ -1,0 +1,11 @@
+vehicle_config:
+  length: 2.4
+  hight: 1.74
+  width: 0.97
+  wheel_base: 1.67
+  wheel_angle_max: 1.67
+  steering_angle_max: 1.67
+  steering_offset: 0x400
+  brake_offset: 26
+  
+

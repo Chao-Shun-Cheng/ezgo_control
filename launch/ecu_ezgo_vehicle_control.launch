@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+
+  <arg name="info_path" default="$(find ezgo_control)/config/E-Z-GO-RXV-ELiTE-Lithium.yaml"/>
+
+  <node pkg="ezgo_control" type="ecu_ezgo_vehicle_control" name="ecu_ezgo_vehicle_control" output="screen">
+    <rosparam command="load" file="$(arg info_path)"/>
+  </node>
+</launch>
+

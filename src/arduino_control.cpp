@@ -8,6 +8,7 @@ using namespace mn::CppLinuxSerial;
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
 vehicle_cmd_t vehicle_cmd;
+vehicle_config_t vehicle_config;
 int willExit = 0;
 
 void arduino_serial_write(SerialPort *serialPort)
@@ -76,7 +77,7 @@ static void *reader_handler(void *args)
         if (readData.size() == READ_LENGTH) {
             vehicle_info.brake = readData[0];
             vehicle_info.throttle = readData[1];
-            vehicle_info.steering_angle = (float) ((int16_t)(((readData[2] << 8) & 0xff00) + readData[3]) - STEERING_OFFSET);
+            vehicle_info.steering_angle = (float) ((int16_t)(((readData[2] << 8) & 0xff00) + readData[3]) - vehicle_config.steering_offset);
             vehicle_info.velocity = (float) ((int16_t)(((readData[4] << 8) & 0xff00) + readData[5]));
             vehicle_info.velocity /= 1000.0;
             vehicle_info.shift = readData[6] & 0x03;
@@ -100,9 +101,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ros::init(argc, argv, "arduino_cotrol");
+    ros::init(argc, argv, "arduino_ezgo_vehicle_control");
     ros::NodeHandle nh;
 
+    if (!loading_vehicle_config()) {
+        ROS_ERROR("Can't load vehicle config!");
+        return 0;
+    }
+    
     ros::Subscriber sub[6];
     sub[0] = nh.subscribe("/twist_cmd", 1, twistCMDCallback);
     sub[1] = nh.subscribe("/mode_cmd", 1, modeCMDCallback);

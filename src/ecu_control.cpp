@@ -14,6 +14,7 @@
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
 vehicle_cmd_t vehicle_cmd;
+vehicle_config_t vehicle_config;
 int willExit = 0;
 
 static void checkCAN(const char *id, canStatus stat)
@@ -126,7 +127,7 @@ static void *CAN_Info_Receiver(void *args)
             if (id == CAN_READ_ID1 && dlc == 7) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
-                vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - STEERING_OFFSET);
+                vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
                 vehicle_info.shift = msg[4];
                 vehicle_info.turninglight = msg[5];
                 vehicle_info.headlight = msg[6];
@@ -150,9 +151,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    ros::init(argc, argv, "ecu_control");
+    ros::init(argc, argv, "ecu_ezgo_vehicle_control");
     ros::NodeHandle nh;
 
+    if (!loading_vehicle_config()) {
+        ROS_ERROR("Can't load vehicle config!");
+        return 0;
+    }
+    
     ros::Subscriber sub[6];
     sub[0] = nh.subscribe("/twist_cmd", 1, twistCMDCallback);
     sub[1] = nh.subscribe("/mode_cmd", 1, modeCMDCallback);

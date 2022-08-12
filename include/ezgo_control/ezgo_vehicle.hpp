@@ -1,4 +1,5 @@
 #include <math.h>
+#include <chrono>
 #include <pthread.h>
 #include <ros/ros.h>
 #include <signal.h>
@@ -15,15 +16,8 @@
 #include <tablet_socket_msgs/gear_cmd.h>
 #include <tablet_socket_msgs/mode_cmd.h>
 
-#define STEERING_OFFSET 0x400
-#define BRAKE_OFFSET 26
 #define KMH_TO_MS 3.6 // [km/hr] -> [m/s]
 #define CHANGE_SHIFT_TIME 3 // [sec]
-#define STEERING_ANGLE_MAX 30
-#define WHEEL_ANGLE_MAX 30
-#define WHEEL_BASE 30
-#define WHEEL_TO_STEERING (STEERING_ANGLE_MAX / WHEEL_ANGLE_MAX)
-
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -42,6 +36,18 @@ enum TurningLight { NONE = 0, LEFT = 1, RIGHT = 2, BOTH = 3 };
 enum Shift { PARKING = 0, REVERSE = 1, NEUTRAL = 2, DRIVE = 3 };
 
 enum Mode { MANUAL = 0, AUTONOMOUS = 1, OVERRIDE = 2, CARINIT = 3 };
+
+typedef struct vehicle_config {
+    float length;
+    float hight;
+    float width;
+    float wheel_base;
+    float wheel_angle_max;
+    float steering_angle_max;
+    int steering_offset;
+    int brake_offset;
+    double wheel_to_steering;
+} vehicle_config_t;
 
 typedef struct vehicle_info {
     int throttle;
@@ -68,7 +74,26 @@ typedef struct vehicle_cmd {
 
 extern vehicle_cmd_t vehicle_cmd;
 extern vehicle_info_t vehicle_info;
+extern vehicle_config_t vehicle_config;
 extern int willExit;
+
+int loading_vehicle_config()
+{
+    ros::NodeHandle private_nh_("~");
+    private_nh_.param<float>("/vehicle_config/length", vehicle_config.length, 2.4);
+    private_nh_.param<float>("/vehicle_config/hight", vehicle_config.hight, 1.74);
+    private_nh_.param<float>("/vehicle_config/width", vehicle_config.width, 0.97);
+    private_nh_.param<float>("/vehicle_config/wheel_base", vehicle_config.wheel_base, 1.67);
+    private_nh_.param<float>("/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
+    private_nh_.param<float>("/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
+    private_nh_.param<int>("/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
+    private_nh_.param<int>("/vehicle_config/brake_offset", vehicle_config.brake_offset, 26);
+    if (vehicle_config.wheel_angle_max != 0)
+        vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
+    else 
+        return false;
+    return true;
+}
 
 void cmd_reset()
 {
@@ -140,14 +165,6 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
     vehicle_cmd.brake_stroke = brake.brake;
 }
 
-void vehicle_control() 
-{
-    CheckShift();
-    SteeringControl();
-    PedalControl(fabs(vehicle_cmd.linear_x), vehicle_info.velocity / KMH_TO_MS);
-    return;
-}
-
 void CheckShift()
 {
     static bool wait_for_change_shift = false;
@@ -156,7 +173,11 @@ void CheckShift()
         vehicle_cmd.linear_x = vehicle_info.velocity > 1 ? vehicle_info.velocity / 2 : 0;
     }
     if (wait_for_change_shift && vehicle_info.velocity == 0) {
-        std::this_thread::sleep_for(std::chrono::seconds(CHANGE_SHIFT_TIME));
+        ros::Time start = ros::Time::now();
+        while (1) {
+            if (ros::Time::now().toSec() - start.toSec() > CHANGE_SHIFT_TIME)
+                break;
+        }
         wait_for_change_shift = false;
     }
     if (vehicle_cmd.linear_x < 0)
@@ -174,10 +195,10 @@ void SteeringControl()
     if (vehicle_cmd.linear_x < 0.1) {
         vehicle_cmd.steering_angle = pre_cmd_steering_angle;
     } else {
-        double phi_angle_pi = (v_cmd.angular_z / v_cmd.linear_x);
-        double wheel_angle_pi = phi_angle_pi * WHEEL_BASE;
+        double phi_angle_pi = (vehicle_cmd.angular_z / vehicle_cmd.linear_x);
+        double wheel_angle_pi = phi_angle_pi * vehicle_config.wheel_base;
         double wheel_angle = (wheel_angle_pi / M_PI) * 180.0;
-        vehicle_cmd.steering_angle = wheel_angle * WHEEL_TO_STEERING;
+        vehicle_cmd.steering_angle = wheel_angle * vehicle_config.wheel_to_steering;
         pre_cmd_steering_angle = vehicle_cmd.steering_angle;
     }
     return;
@@ -185,17 +206,25 @@ void SteeringControl()
 
 void PedalControl(const double cmd_velocity, const double current_velocity) 
 {
+    // TODO
+}
 
+void vehicle_control() 
+{
+    CheckShift();
+    SteeringControl();
+    PedalControl(fabs(vehicle_cmd.linear_x), vehicle_info.velocity / KMH_TO_MS);
+    return;
 }
 
 void checkRange() 
 {
-    vehicle_cmd.steering_angle = vehicle_cmd.steering_angle + STEERING_OFFSET;
-    if (vehicle_cmd.steering_angle < 0) vehicle_cmd.steering_angle = 0;
-    else if (vehicle_cmd.steering_angle > 1440) vehicle_cmd.steering_angle = 1440;
-
-    vehicle_cmd.brake_stroke = vehicle_cmd.brake_stroke + BRAKE_OFFSET;
-    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = BRAKE_OFFSET;
+    if (vehicle_cmd.steering_angle < -vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = -vehicle_config.steering_angle_max;
+    else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
+    vehicle_cmd.steering_angle = vehicle_cmd.steering_angle + vehicle_config.steering_offset;
+    
+    vehicle_cmd.brake_stroke = vehicle_cmd.brake_stroke + vehicle_config.brake_offset;
+    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = vehicle_config.brake_offset;
     else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
 
     if (vehicle_cmd.accel_stroke < 0) vehicle_cmd.accel_stroke = 0;
