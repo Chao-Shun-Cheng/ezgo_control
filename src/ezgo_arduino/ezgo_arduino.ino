@@ -100,7 +100,7 @@ void showInfo()
 
     int current_vel = vel * 1000;
     writer_buf[4] = (current_vel & 0xff00) >> 8;
-    writer_buf[5] = current_vel & 0xff;
+    writer_buf[5] = current_vel & 0x00ff;
 
     writer_buf[6] = ((mode & 0x1) << 5); // control mode
     writer_buf[6] |= reader_buf[4];      // shift

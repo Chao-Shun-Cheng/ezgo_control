@@ -162,7 +162,7 @@ void accellCMDCallback(const autoware_msgs::AccelCmd &accell)
 
 void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
 {
-    vehicle_cmd.brake_stroke = brake.brake;
+    vehicle_cmd.brake_stroke = brake.brake + vehicle_config.brake_offset;
 }
 
 void CheckShift()
@@ -223,8 +223,7 @@ void checkRange()
     else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
     vehicle_cmd.steering_angle = vehicle_cmd.steering_angle + vehicle_config.steering_offset;
     
-    vehicle_cmd.brake_stroke = vehicle_cmd.brake_stroke + vehicle_config.brake_offset;
-    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = vehicle_config.brake_offset;
+    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
     else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
 
     if (vehicle_cmd.accel_stroke < 0) vehicle_cmd.accel_stroke = 0;
@@ -285,6 +284,7 @@ void showVehicleInfo()
 
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
     std::cout << "Brake : " << vehicle_info.brake << std::endl;
+    std::cout << "Steering Angle : " << vehicle_info.steering_angle << std::endl;
     std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]"<< std::endl;
 
     switch (vehicle_info.headlight) {

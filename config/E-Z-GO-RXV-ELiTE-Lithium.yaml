@@ -5,7 +5,7 @@ vehicle_config:
   wheel_base: 1.67
   wheel_angle_max: 1.67
   steering_angle_max: 1.67
-  steering_offset: 0x400
+  steering_offset: 1024 # 0x400
   brake_offset: 26
   
 
