@@ -81,9 +81,9 @@ static void *reader_handler(void *args)
             vehicle_info.velocity = (float) ((int16_t)(((readData[4] << 8) & 0xff00) + readData[5]));
             vehicle_info.velocity /= 1000.0;
             vehicle_info.shift = readData[6] & 0x03;
-            vehicle_info.turninglight = readData[6] & 0x0c;
-            vehicle_info.headlight = readData[6] & 0x10;
-            vehicle_info.control_mode = readData[6] & 0x20;
+            vehicle_info.turninglight = (readData[6] & 0x0c) >> 2;
+            vehicle_info.headlight = (readData[6] & 0x10) >> 4;
+            vehicle_info.control_mode = (readData[6] & 0x20) >> 5;
             showVehicleInfo();
         } else {
             std::cout << RED << "Without Receive DATA, Check connect ...." << RESET << std::endl;
