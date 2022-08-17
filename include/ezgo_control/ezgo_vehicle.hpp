@@ -47,6 +47,7 @@ typedef struct vehicle_config {
     int steering_offset;
     int brake_offset;
     double wheel_to_steering;
+    std::string steering_port;
 } vehicle_config_t;
 
 typedef struct vehicle_info {
@@ -77,7 +78,7 @@ extern vehicle_info_t vehicle_info;
 extern vehicle_config_t vehicle_config;
 extern int willExit;
 
-int loading_vehicle_config()
+bool loading_vehicle_config()
 {
     ros::NodeHandle private_nh_("~");
     private_nh_.param<float>("/vehicle_config/length", vehicle_config.length, 2.4);
@@ -87,6 +88,7 @@ int loading_vehicle_config()
     private_nh_.param<float>("/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
     private_nh_.param<float>("/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
     private_nh_.param<int>("/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
+    private_nh_.param<std::string>("/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
     private_nh_.param<int>("/vehicle_config/brake_offset", vehicle_config.brake_offset, 26);
     if (vehicle_config.wheel_angle_max != 0)
         vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
@@ -221,7 +223,7 @@ void checkRange()
 {
     if (vehicle_cmd.steering_angle < -vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = -vehicle_config.steering_angle_max;
     else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
-    vehicle_cmd.steering_angle = vehicle_cmd.steering_angle + vehicle_config.steering_offset;
+    
     
     if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
     else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;

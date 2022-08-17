@@ -27,7 +27,8 @@ add_dependencies(arduino_ezgo_vehicle_control
 )
 
 add_executable(ecu_ezgo_vehicle_control
-  src/ecu_control.cpp)
+  src/ecu_control.cpp
+  src/SerialPort.cpp)
 target_link_libraries(ecu_ezgo_vehicle_control ${catkin_LIBRARIES})
 if(EXISTS "/usr/include/canlib.h")
 target_link_libraries(ecu_ezgo_vehicle_control canlib)

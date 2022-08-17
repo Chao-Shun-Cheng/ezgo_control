@@ -1,5 +1,8 @@
 #include <canlib.h>
+#include <ezgo_control/SerialPort.hpp>
 #include <ezgo_control/ezgo_vehicle.hpp>
+
+using namespace mn::CppLinuxSerial;
 
 #define CAN_CHANNEL 0
 #define CAN_BITRATE BAUD_250K
@@ -9,7 +12,9 @@
 #define CAN_READ_ID1 0x060
 #define CAN_READ_ID2 0x061
 
-
+#define angle_write(pluse) ("abs " + pluse + "@")
+#define sleep_time 0.5
+#define pluse_to_degree (360 / 3200 / 6 / 2)
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -31,7 +36,7 @@ static void checkCAN(const char *id, canStatus stat)
 canStatus Kvaser_canbus_write()
 {
     static char msg[CAN_WRITE_DLC];
-    int16_t int16_angle = (int16_t) vehicle_cmd.steering_angle;
+    int16_t int16_angle = (int16_t) (vehicle_cmd.steering_angle + vehicle_config.steering_offset);
     msg[0] = vehicle_cmd.brake_stroke;
     msg[1] = vehicle_cmd.accel_stroke;
     msg[4] = vehicle_cmd.shift;
@@ -68,7 +73,8 @@ static void *CAN_Info_Sender(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
     std::cout << GREEN << "[ezgo_control::CAN_Info_Sender] can open done." << RESET << std::endl;
-
+    
+    SerialPort *serialPort = (SerialPort *) args;
     vehicle_cmd_t prev_vehicle_cmd;
     ros::Rate rate(50);
     cmd_reset();
@@ -88,6 +94,12 @@ static void *CAN_Info_Sender(void *args)
             case 2:  // UI direct control
                 checkRange();
                 Kvaser_canbus_write();
+
+                int pluse = (int) vehicle_cmd.steering_angle / pluse_to_degree;
+                pthread_mutex_lock(&mutex);
+                serialPort->Write(angle_write(std::to_string(pluse)));
+                pthread_mutex_unlock(&mutex);
+
                 break;
             }
             prev_vehicle_cmd = vehicle_cmd;
@@ -102,6 +114,7 @@ static void *CAN_Info_Sender(void *args)
 static void *CAN_Info_Receiver(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
+    SerialPort *serialPort = (SerialPort *) args;
     canHandle hnd = -1;
     canStatus stat;
     long id;
@@ -127,20 +140,74 @@ static void *CAN_Info_Receiver(void *args)
             if (id == CAN_READ_ID1 && dlc == 7) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
-                vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
+                // vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
                 vehicle_info.shift = msg[4];
                 vehicle_info.turninglight = msg[5];
                 vehicle_info.headlight = msg[6];
             } else if (id == CAN_READ_ID2 && dlc == 5) {
                 vehicle_info.control_mode = msg[0];
-                vehicle_info.velocity = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
+                vehicle_info.velocity = (float) ((int16_t)(((msg[1] << 8) & 0xff00) + msg[2]));
                 vehicle_info.velocity /= 1000.0;
-            }
-            showVehicleInfo();
+            }   
         }
+
+        std::string readData;
+        pthread_mutex_lock(&mutex);
+        serialPort->Write("rabs@");
+        sleep(sleep_time);
+        serialPort->Read(readData);
+		pthread_mutex_unlock(&mutex);
+        if (readData.size() == 9) {
+            float pluse = 0;
+            int sign = 0;
+            for (int i = 0; i < readData.size(); i++) {
+                if (readData[i] == '+') sign = 1; 
+                if (readData[i] == '-') sign = -1;
+                if (readData[i] >= 0 && readData[i] <= 9) pluse = pluse * 10 + (readData[i] - '0');
+            }
+            vehicle_info.steering_angle = sign * pluse * pluse_to_degree;
+        } else {
+            std::cout << RED << "steering angle feedback error" << RESET << std::endl;
+        }
+
+        showVehicleInfo();
     }
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
     return nullptr;
+}
+
+bool init_steering_angle(SerialPort *serialPort)
+{
+
+    serialPort->Write("sabs 0@");
+    sleep(sleep_time);
+    serialPort->Write("encdiv 400@");
+    sleep(sleep_time);
+    serialPort->Write("div 3200@");
+    sleep(sleep_time);
+    serialPort->Write("enc 1@");
+    sleep(sleep_time);
+    serialPort->Write("cur 1.1@");
+    sleep(sleep_time);
+    serialPort->Write("solm+ 47000@");
+    sleep(sleep_time);
+    serialPort->Write("solm- -47000@");
+    sleep(sleep_time);
+    serialPort->Write("solmsw 1@");
+    sleep(sleep_time);
+    serialPort->Write("svs 200@");
+    sleep(sleep_time);
+    serialPort->Write("str 65@");
+    sleep(sleep_time);
+    serialPort->Write("svr 40000@");
+    sleep(sleep_time);
+    serialPort->Write("cur 2@");
+    sleep(sleep_time);
+    serialPort->Write("hold 1@");
+    sleep(sleep_time);
+    serialPort->Write("save@");
+    sleep(sleep_time);
+    return true;
 }
 
 int main(int argc, char **argv)
@@ -159,6 +226,16 @@ int main(int argc, char **argv)
         return 0;
     }
     
+    SerialPort serialPort(vehicle_config.steering_port, BaudRate::B_115200, NumDataBits::EIGHT, Parity::NONE, NumStopBits::ONE);
+    serialPort.SetTimeout(-1);
+    serialPort.Open();
+	std::cout << GREEN << "Open serial port for steering" << RESET << std::endl;
+
+    if (!init_steering_angle(&serialPort)) {
+        ROS_ERROR("Can't initialize steering controller!");
+        return 0;
+    }
+
     ros::Subscriber sub[6];
     sub[0] = nh.subscribe("/twist_cmd", 1, twistCMDCallback);
     sub[1] = nh.subscribe("/mode_cmd", 1, modeCMDCallback);
@@ -170,12 +247,12 @@ int main(int argc, char **argv)
     pthread_t thread_writer;
     pthread_t thread_reader;
 
-    if (pthread_create(&thread_writer, NULL, CAN_Info_Sender, NULL)) {
+    if (pthread_create(&thread_writer, NULL, CAN_Info_Sender, &serialPort)) {
         perror("could not create thread for CAN_Info_Sender");
         return -1;
     }
 
-    if (pthread_create(&thread_reader, NULL, CAN_Info_Receiver, NULL)) {
+    if (pthread_create(&thread_reader, NULL, CAN_Info_Receiver, &serialPort)) {
         perror("could not create thread for CAN_Info_Receiver");
         return -1;
     }
