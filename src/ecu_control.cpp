@@ -69,6 +69,51 @@ canStatus Kvaser_canbus_write()
     return stat;
 }
 
+void serial_steering_write(SerialPort *serialPort) 
+{
+    int pluse = (int) vehicle_cmd.steering_angle / pluse_to_degree;
+    bool findEnd = false;
+    pthread_mutex_lock(&mutex);
+    serialPort->Write(angle_write(std::to_string(pluse)));
+    while (serialPort->Available() && !findEnd) {
+        std::string readData;
+        serialPort->Read(readData);
+        for (int i = 0; i < readData; i++) {
+            if (readData[i] == '>') {
+                findEnd = true;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    return;
+}
+
+void serial_steering_read(SerialPort *serialPort) 
+{
+    bool findEnd = false;
+    int sign = 0;
+    float pluse = 0;
+    pthread_mutex_lock(&mutex);
+    serialPort->Write("rabs@");
+    while (serialPort->Available() && !findEnd) {
+        std::string readData;
+        serialPort->Read(readData);
+        for (int i = 0; i < readData.size(); i++) {
+            if (readData[i] == '+') sign = 1; 
+            if (readData[i] == '-') sign = -1;
+            if (readData[i] >= 0 && readData[i] <= 9) pluse = pluse * 10 + (readData[i] - '0');
+            if (readData[i] == '!') {
+                findEnd = true;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    vehicle_info.steering_angle = sign * pluse * pluse_to_degree;
+    return;
+}
+
 static void *CAN_Info_Sender(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
@@ -94,12 +139,7 @@ static void *CAN_Info_Sender(void *args)
             case 2:  // UI direct control
                 checkRange();
                 Kvaser_canbus_write();
-
-                int pluse = (int) vehicle_cmd.steering_angle / pluse_to_degree;
-                pthread_mutex_lock(&mutex);
-                serialPort->Write(angle_write(std::to_string(pluse)));
-                pthread_mutex_unlock(&mutex);
-
+                serial_steering_write(serialPort);
                 break;
             }
             prev_vehicle_cmd = vehicle_cmd;
@@ -150,26 +190,7 @@ static void *CAN_Info_Receiver(void *args)
                 vehicle_info.velocity /= 1000.0;
             }   
         }
-
-        std::string readData;
-        pthread_mutex_lock(&mutex);
-        serialPort->Write("rabs@");
-        sleep(sleep_time);
-        serialPort->Read(readData);
-		pthread_mutex_unlock(&mutex);
-        if (readData.size() == 9) {
-            float pluse = 0;
-            int sign = 0;
-            for (int i = 0; i < readData.size(); i++) {
-                if (readData[i] == '+') sign = 1; 
-                if (readData[i] == '-') sign = -1;
-                if (readData[i] >= 0 && readData[i] <= 9) pluse = pluse * 10 + (readData[i] - '0');
-            }
-            vehicle_info.steering_angle = sign * pluse * pluse_to_degree;
-        } else {
-            std::cout << RED << "steering angle feedback error" << RESET << std::endl;
-        }
-
+        serial_steering_read(serialPort);
         showVehicleInfo();
     }
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
@@ -178,35 +199,20 @@ static void *CAN_Info_Receiver(void *args)
 
 bool init_steering_angle(SerialPort *serialPort)
 {
-
     serialPort->Write("sabs 0@");
-    sleep(sleep_time);
     serialPort->Write("encdiv 400@");
-    sleep(sleep_time);
     serialPort->Write("div 3200@");
-    sleep(sleep_time);
     serialPort->Write("enc 1@");
-    sleep(sleep_time);
     serialPort->Write("cur 1.1@");
-    sleep(sleep_time);
     serialPort->Write("solm+ 47000@");
-    sleep(sleep_time);
     serialPort->Write("solm- -47000@");
-    sleep(sleep_time);
     serialPort->Write("solmsw 1@");
-    sleep(sleep_time);
     serialPort->Write("svs 200@");
-    sleep(sleep_time);
     serialPort->Write("str 65@");
-    sleep(sleep_time);
     serialPort->Write("svr 40000@");
-    sleep(sleep_time);
     serialPort->Write("cur 2@");
-    sleep(sleep_time);
     serialPort->Write("hold 1@");
-    sleep(sleep_time);
     serialPort->Write("save@");
-    sleep(sleep_time);
     return true;
 }
 
