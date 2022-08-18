@@ -31,7 +31,7 @@ static void checkCAN(const char *id, canStatus stat)
 canStatus Kvaser_canbus_write()
 {
     static char msg[CAN_WRITE_DLC];
-    int16_t int16_angle = (int16_t) vehicle_cmd.steering_angle;
+    uint16_t int16_angle = (uint16_t) vehicle_cmd.steering_angle;
     msg[0] = vehicle_cmd.brake_stroke;
     msg[1] = vehicle_cmd.accel_stroke;
     msg[4] = vehicle_cmd.shift;
@@ -127,13 +127,13 @@ static void *CAN_Info_Receiver(void *args)
             if (id == CAN_READ_ID1 && dlc == 7) {
                 vehicle_info.brake = msg[0];
                 vehicle_info.throttle = msg[1];
-                vehicle_info.steering_angle = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
+                vehicle_info.steering_angle = (float) ((uint16_t)(((msg[2] << 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
                 vehicle_info.shift = msg[4];
                 vehicle_info.turninglight = msg[5];
                 vehicle_info.headlight = msg[6];
             } else if (id == CAN_READ_ID2 && dlc == 5) {
                 vehicle_info.control_mode = msg[0];
-                vehicle_info.velocity = (float) ((int16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
+                vehicle_info.velocity = (float) ((uint16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
                 vehicle_info.velocity /= 1000.0;
             }
             showVehicleInfo();
