@@ -12,9 +12,15 @@ using namespace mn::CppLinuxSerial;
 #define CAN_READ_ID1 0x060
 #define CAN_READ_ID2 0x061
 
+/*
+ * pulse to degree 
+ * This is change pulse of steering motor to steering degree.
+ * 360 / 3200 / 6 / 2
+ * degree per cycle / pulse per cycle / 1st stage gear ratio / 2nd stage gear ratio
+*/
+#define pulse_to_degree 0.009375 
 #define angle_write(pluse) ("abs " + pluse + "@")
 #define sleep_time 0.5
-#define pluse_to_degree (360 / 3200 / 6 / 2)
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -71,14 +77,14 @@ canStatus Kvaser_canbus_write()
 
 void serial_steering_write(SerialPort *serialPort) 
 {
-    int pluse = (int) vehicle_cmd.steering_angle / pluse_to_degree;
+    int pulse = (int) (vehicle_cmd.steering_angle / pulse_to_degree);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
-    serialPort->Write(angle_write(std::to_string(pluse)));
+    serialPort->Write(angle_write(std::to_string(pulse)));
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
-        for (int i = 0; i < readData; i++) {
+        for (int i = 0; i < readData.size(); i++) {
             if (readData[i] == '>') {
                 findEnd = true;
                 break;
@@ -93,16 +99,17 @@ void serial_steering_read(SerialPort *serialPort)
 {
     bool findEnd = false;
     int sign = 0;
-    float pluse = 0;
+    int pluse = 0;
     pthread_mutex_lock(&mutex);
     serialPort->Write("rabs@");
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
         for (int i = 0; i < readData.size(); i++) {
+            
             if (readData[i] == '+') sign = 1; 
             if (readData[i] == '-') sign = -1;
-            if (readData[i] >= 0 && readData[i] <= 9) pluse = pluse * 10 + (readData[i] - '0');
+            if (readData[i] >= '0' && readData[i] <= '9') pluse = pluse * 10 + (readData[i] - '0');
             if (readData[i] == '!') {
                 findEnd = true;
                 break;
@@ -110,7 +117,46 @@ void serial_steering_read(SerialPort *serialPort)
         }
     }
     pthread_mutex_unlock(&mutex);
-    vehicle_info.steering_angle = sign * pluse * pluse_to_degree;
+    if (findEnd)
+        vehicle_info.steering_angle = sign * pluse * pulse_to_degree;
+    return;
+}
+
+void hold_steering(SerialPort *serialPort) 
+{
+    bool findEnd = false;
+    pthread_mutex_lock(&mutex);
+    serialPort->Write("hold 0@");
+    while (serialPort->Available() && !findEnd) {
+        std::string readData;
+        serialPort->Read(readData);
+        for (int i = 0; i < readData.size(); i++) {
+            if (readData[i] == '!') {
+                findEnd = true;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+    return;
+}
+
+void free_steering(SerialPort *serialPort) 
+{
+    bool findEnd = false;
+    pthread_mutex_lock(&mutex);
+    serialPort->Write("hold 1@");
+    while (serialPort->Available() && !findEnd) {
+        std::string readData;
+        serialPort->Read(readData);
+        for (int i = 0; i < readData.size(); i++) {
+            if (readData[i] == '!') {
+                findEnd = true;
+                break;
+            }
+        }
+    }
+    pthread_mutex_unlock(&mutex);
     return;
 }
 
@@ -129,16 +175,20 @@ static void *CAN_Info_Sender(void *args)
         if (update_cmd(prev_vehicle_cmd)) {
             switch (vehicle_cmd.modeValue) {
             case 0:
+                free_steering(serialPort);
                 cmd_reset();
                 break;
             case 1:  // autonomous mode
                 vehicle_control();
                 checkRange();
                 Kvaser_canbus_write();
+                hold_steering(serialPort);
+                serial_steering_write(serialPort);
                 break;
             case 2:  // UI direct control
                 checkRange();
                 Kvaser_canbus_write();
+                hold_steering(serialPort);
                 serial_steering_write(serialPort);
                 break;
             }
@@ -173,7 +223,7 @@ static void *CAN_Info_Receiver(void *args)
     checkCAN("canSetBusParams", stat);
     canBusOn(hnd);
     std::cout << GREEN << "[ezgo_control::CAN_Info_Receiver] can open done, Channel " << CAN_CHANNEL << RESET << std::endl;
-
+    ros::Rate rate(50);
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
@@ -192,6 +242,7 @@ static void *CAN_Info_Receiver(void *args)
         }
         serial_steering_read(serialPort);
         showVehicleInfo();
+        rate.sleep();
     }
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
     return nullptr;
@@ -199,20 +250,11 @@ static void *CAN_Info_Receiver(void *args)
 
 bool init_steering_angle(SerialPort *serialPort)
 {
+    ros::Rate delay(10);
     serialPort->Write("sabs 0@");
-    serialPort->Write("encdiv 400@");
-    serialPort->Write("div 3200@");
-    serialPort->Write("enc 1@");
-    serialPort->Write("cur 1.1@");
-    serialPort->Write("solm+ 47000@");
-    serialPort->Write("solm- -47000@");
-    serialPort->Write("solmsw 1@");
-    serialPort->Write("svs 200@");
-    serialPort->Write("str 65@");
-    serialPort->Write("svr 40000@");
-    serialPort->Write("cur 2@");
+    delay.sleep();
     serialPort->Write("hold 1@");
-    serialPort->Write("save@");
+    delay.sleep();
     return true;
 }
 

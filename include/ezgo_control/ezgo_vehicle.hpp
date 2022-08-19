@@ -89,7 +89,7 @@ bool loading_vehicle_config()
     private_nh_.param<float>("/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
     private_nh_.param<int>("/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
     private_nh_.param<std::string>("/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
-    private_nh_.param<int>("/vehicle_config/brake_offset", vehicle_config.brake_offset, 26);
+    private_nh_.param<int>("/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
     if (vehicle_config.wheel_angle_max != 0)
         vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
     else 
@@ -223,7 +223,6 @@ void checkRange()
 {
     if (vehicle_cmd.steering_angle < -vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = -vehicle_config.steering_angle_max;
     else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
-    
     
     if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
     else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
