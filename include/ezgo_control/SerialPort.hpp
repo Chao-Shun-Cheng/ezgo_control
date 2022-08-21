@@ -28,16 +28,20 @@ namespace mn
 {
 namespace CppLinuxSerial
 {
-/// \brief      Represents the baud rate "types" that can be used with the serial port. STANDARD represents all
-///             the standard baud rates as provided by UNIX, CUSTOM represents a baud rate defined by an arbitray integer.
+/// \brief      Represents the baud rate "types" that can be used with the
+/// serial port. STANDARD represents all
+///             the standard baud rates as provided by UNIX, CUSTOM represents a
+///             baud rate defined by an arbitray integer.
 enum class BaudRateType {
     STANDARD,
     CUSTOM,
 };
 
-/// \brief		Strongly-typed enumeration of baud rates for use with the SerialPort class
-/// \details    Specifies all the same baud rates as UNIX, as well as B_CUSTOM to specify your
-///             own. See https://linux.die.net/man/3/cfsetispeed for list of supported UNIX baud rates.
+/// \brief		Strongly-typed enumeration of baud rates for use with the
+/// SerialPort class \details    Specifies all the same baud rates as UNIX, as
+/// well as B_CUSTOM to specify your
+///             own. See https://linux.die.net/man/3/cfsetispeed for list of
+///             supported UNIX baud rates.
 enum class BaudRate {
     B_0,
     B_50,
@@ -62,7 +66,8 @@ enum class BaudRate {
     B_CUSTOM,  // Placeholder
 };
 
-/// \brief      Enumeration of all the valid num. of data bits. Must align with the options
+/// \brief      Enumeration of all the valid num. of data bits. Must align with
+/// the options
 ///                 provided in termbits.h, i.e. CS5, CS6, CS7 and CS8.
 enum class NumDataBits {
     FIVE,
@@ -92,16 +97,20 @@ enum class State {
 class SerialPort
 {
 public:
-    /// \brief		Default constructor. You must specify at least the device before calling Open().
+    /// \brief		Default constructor. You must specify at least the device
+    /// before calling Open().
     SerialPort();
 
-    /// \brief		Constructor that sets up serial port with the basic (required) parameters.
+    /// \brief		Constructor that sets up serial port with the basic
+    /// (required) parameters.
     SerialPort(const std::string &device, BaudRate baudRate);
 
-    /// \brief		Constructor that sets up serial port and allows the user to specify all the common parameters.
+    /// \brief		Constructor that sets up serial port and allows the user to
+    /// specify all the common parameters.
     SerialPort(const std::string &device, BaudRate baudRate, NumDataBits numDataBits, Parity parity, NumStopBits numStopBits);
 
-    /// \brief		Constructor that sets up serial port with the basic parameters, and a custom baud rate.
+    /// \brief		Constructor that sets up serial port with the basic
+    /// parameters, and a custom baud rate.
     SerialPort(const std::string &device, speed_t baudRate);
 
     /// \brief		Destructor. Closes serial port if still open.
@@ -126,15 +135,18 @@ public:
     void SetNumStopBits(NumStopBits numStopBits);
 
     /// \brief      Sets the read timeout (in milliseconds)/blocking mode.
-    /// \details    Only call when state != OPEN. This method manupulates VMIN and VTIME.
-    /// \param      timeout_ms  Set to -1 to infinite timeout, 0 to return immediately with any data (non
-    ///             blocking, or >0 to wait for data for a specified number of milliseconds). Timeout will
-    ///             be rounded to the nearest 100ms (a Linux API restriction). Maximum value limited to
-    ///             25500ms (another Linux API restriction).
+    /// \details    Only call when state != OPEN. This method manupulates VMIN
+    /// and VTIME. \param      timeout_ms  Set to -1 to infinite timeout, 0 to
+    /// return immediately with any data (non
+    ///             blocking, or >0 to wait for data for a specified number of
+    ///             milliseconds). Timeout will be rounded to the nearest 100ms
+    ///             (a Linux API restriction). Maximum value limited to 25500ms
+    ///             (another Linux API restriction).
     void SetTimeout(int32_t timeout_ms);
 
     /// \brief		Enables/disables echo.
-    /// \param		value		Pass in true to enable echo, false to disable echo.
+    /// \param		value		Pass in true to enable echo, false to disable
+    /// echo.
     void SetEcho(bool value);
 
     /// \brief		Opens the COM port for use.
@@ -156,22 +168,24 @@ public:
     void WriteBinary(const std::vector<uint8_t> &data);
 
     /// \brief		Use to read text from the COM port.
-    /// \param		data		The object the read characters from the COM port will be saved to.
-    /// \param      wait_ms     The amount of time to wait for data. Set to 0 for non-blocking mode. Set to -1
+    /// \param		data		The object the read characters from the COM port
+    /// will be saved to. \param      wait_ms     The amount of time to wait for
+    /// data. Set to 0 for non-blocking mode. Set to -1
     ///                 to wait indefinitely for new data.
     /// \throws		CppLinuxSerial::Exception if state != OPEN.
     void Read(std::string &data);
 
     /// \brief		Use to read binary data from the COM port.
-    /// \param		data		The object the read uint8_t bytes from the COM port will be saved to.
-    /// \param      wait_ms     The amount of time to wait for data. Set to 0 for non-blocking mode. Set to -1
+    /// \param		data		The object the read uint8_t bytes from the COM
+    /// port will be saved to. \param      wait_ms     The amount of time to
+    /// wait for data. Set to 0 for non-blocking mode. Set to -1
     ///                 to wait indefinitely for new data.
     /// \throws		CppLinuxSerial::Exception if state != OPEN.
     void ReadBinary(std::vector<uint8_t> &data);
 
     /// \brief		Use to get number of bytes available in receive buffer.
-    /// \returns    The number of bytes available in the receive buffer (ready to be read).
-    /// \throws		CppLinuxSerial::Exception if state != OPEN.
+    /// \returns    The number of bytes available in the receive buffer (ready
+    /// to be read). \throws		CppLinuxSerial::Exception if state != OPEN.
     int32_t Available();
 
     /// \brief          Use to get the state of the serial port
@@ -180,21 +194,25 @@ public:
 
 private:
     /// \brief		Configures the tty device as a serial port.
-    /// \warning    Device must be open (valid file descriptor) when this is called.
+    /// \warning    Device must be open (valid file descriptor) when this is
+    /// called.
     void ConfigureTermios();
 
     // void SetTermios(termios myTermios);
 
-    /// \brief		Returns a populated termios2 structure for the serial port pointed to by the file descriptor.
+    /// \brief		Returns a populated termios2 structure for the serial port
+    /// pointed to by the file descriptor.
     termios2 GetTermios2();
 
-    /// \brief      Assigns the provided tty settings to the serial port pointed to by the file descriptor.
+    /// \brief      Assigns the provided tty settings to the serial port pointed
+    /// to by the file descriptor.
     void SetTermios2(termios2 tty);
 
     /// \brief      Keeps track of the serial port's state.
     State state_;
 
-    /// \brief      The file path to the serial port device (e.g. "/dev/ttyUSB0").
+    /// \brief      The file path to the serial port device (e.g.
+    /// "/dev/ttyUSB0").
     std::string device_;
 
     /// \brief      The type of baud rate that the user has specified.
@@ -215,7 +233,8 @@ private:
     /// \brief      The num. of stop bits. Defaults to 1 (most common).
     NumStopBits numStopBits_ = NumStopBits::ONE;
 
-    /// \brief		The file descriptor for the open file. This gets written to when Open() is called.
+    /// \brief		The file descriptor for the open file. This gets written to
+    /// when Open() is called.
     int fileDesc_;
 
     bool echo_;

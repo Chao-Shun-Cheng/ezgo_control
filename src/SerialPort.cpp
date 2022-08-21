@@ -15,7 +15,8 @@
 #include <unistd.h>  // UNIX standard function definitions
 #include <iostream>
 #include <sstream>
-// #include <termios.h> 	// POSIX terminal control definitions (struct termios)
+// #include <termios.h> 	// POSIX terminal control definitions (struct
+// termios)
 #include <sys/ioctl.h>  // Used for TCGETS2, which is required for custom baud rates
 #include <cassert>
 #include <system_error>  // For throwing std::system_error
@@ -126,7 +127,8 @@ void SerialPort::SetNumStopBits(NumStopBits numStopBits)
 
 void SerialPort::Open()
 {
-    // std::cout << "Attempting to open COM port \"" << device_ << "\"." << std::endl;
+    // std::cout << "Attempting to open COM port \"" << device_ << "\"." <<
+    // std::endl;
 
     if (device_.empty()) {
         THROW_EXCEPT("Attempted to open file when file path has not been assigned to.");
@@ -135,13 +137,15 @@ void SerialPort::Open()
     // Attempt to open file
     // this->fileDesc = open(this->filePath, O_RDWR | O_NOCTTY | O_NDELAY);
 
-    // O_RDONLY for read-only, O_WRONLY for write only, O_RDWR for both read/write access
-    // 3rd, optional parameter is mode_t mode
+    // O_RDONLY for read-only, O_WRONLY for write only, O_RDWR for both
+    // read/write access 3rd, optional parameter is mode_t mode
     fileDesc_ = open(device_.c_str(), O_RDWR);
 
     // Check status
     if (fileDesc_ == -1) {
-        THROW_EXCEPT("Could not open device " + device_ + ". Is the device name correct and do you have read/write permission?");
+        THROW_EXCEPT("Could not open device " + device_ +
+                     ". Is the device name correct and do you have read/write "
+                     "permission?");
     }
 
     ConfigureTermios();
@@ -223,10 +227,10 @@ void SerialPort::ConfigureTermios()
 
     //===================== BAUD RATE =================//
 
-    // We used to use cfsetispeed() and cfsetospeed() with the B... macros, but this didn't allow
-    // us to set custom baud rates. So now to support both standard and custom baud rates lets
-    // just make everything "custom". This giant switch statement could be replaced with a map/lookup
-    // in the future
+    // We used to use cfsetispeed() and cfsetospeed() with the B... macros, but
+    // this didn't allow us to set custom baud rates. So now to support both
+    // standard and custom baud rates lets just make everything "custom". This
+    // giant switch statement could be replaced with a map/lookup in the future
     if (baudRateType_ == BaudRateType::STANDARD) {
         tty.c_cflag &= ~CBAUD;
         tty.c_cflag |= CBAUDEX;
@@ -370,11 +374,12 @@ void SerialPort::ConfigureTermios()
         // struct serial_struct ss;
         // ioctl(fileDesc_, TIOCGSERIAL, &ss);
         // ss.flags = (ss.flags & ~ASYNC_SPD_MASK) | ASYNC_SPD_CUST;
-        // ss.custom_divisor = (ss.baud_base + (baudRateCustom_ / 2)) / baudRateCustom_;
-        // int closestSpeed = ss.baud_base / ss.custom_divisor;
+        // ss.custom_divisor = (ss.baud_base + (baudRateCustom_ / 2)) /
+        // baudRateCustom_; int closestSpeed = ss.baud_base / ss.custom_divisor;
 
-        // if (closestSpeed < baudRateCustom_ * 98 / 100 || closestSpeed > baudRateCustom_ * 102 / 100) {
-        // 	printf("Cannot set serial port speed to %d. Closest possible is %d\n", baudRateCustom_, closestSpeed);
+        // if (closestSpeed < baudRateCustom_ * 98 / 100 || closestSpeed >
+        // baudRateCustom_ * 102 / 100) { 	printf("Cannot set serial port speed
+        // to %d. Closest possible is %d\n", baudRateCustom_, closestSpeed);
         // }
 
         // ioctl(fileDesc_, TIOCSSERIAL, &ss);
@@ -395,13 +400,15 @@ void SerialPort::ConfigureTermios()
 
     // c_cc[VTIME] sets the inter-character timer, in units of 0.1s.
     // Only meaningful when port is set to non-canonical mode
-    // VMIN = 0, VTIME = 0: No blocking, return immediately with what is available
-    // VMIN > 0, VTIME = 0: read() waits for VMIN bytes, could block indefinitely
-    // VMIN = 0, VTIME > 0: Block until any amount of data is available, OR timeout occurs
-    // VMIN > 0, VTIME > 0: Block until either VMIN characters have been received, or VTIME
+    // VMIN = 0, VTIME = 0: No blocking, return immediately with what is
+    // available VMIN > 0, VTIME = 0: read() waits for VMIN bytes, could block
+    // indefinitely VMIN = 0, VTIME > 0: Block until any amount of data is
+    // available, OR timeout occurs VMIN > 0, VTIME > 0: Block until either VMIN
+    // characters have been received, or VTIME
     //                      after first character has elapsed
-    // c_cc[WMIN] sets the number of characters to block (wait) for when read() is called.
-    // Set to 0 if you don't want read to block. Only meaningful when port set to non-canonical mode
+    // c_cc[WMIN] sets the number of characters to block (wait) for when read()
+    // is called. Set to 0 if you don't want read to block. Only meaningful when
+    // port set to non-canonical mode
 
     if (timeout_ms_ == -1) {
         // Always wait for at least one byte, this could
@@ -422,20 +429,24 @@ void SerialPort::ConfigureTermios()
     tty.c_iflag &= ~(IXON | IXOFF | IXANY);  // Turn off s/w flow ctrl
     tty.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL);
 
-    //=========================== LOCAL MODES (c_lflag) =======================//
+    //=========================== LOCAL MODES (c_lflag)
+    //=======================//
 
-    // Canonical input is when read waits for EOL or EOF characters before returning. In non-canonical mode, the rate at which
-    // read() returns is instead controlled by c_cc[VMIN] and c_cc[VTIME]
-    tty.c_lflag &= ~ICANON;  // Turn off canonical input, which is suitable for pass-through
-                             // Configure echo depending on echo_ boolean
+    // Canonical input is when read waits for EOL or EOF characters before
+    // returning. In non-canonical mode, the rate at which read() returns is
+    // instead controlled by c_cc[VMIN] and c_cc[VTIME]
+    tty.c_lflag &= ~ICANON;  // Turn off canonical input, which is suitable for
+                             // pass-through Configure echo depending on echo_ boolean
     if (echo_) {
         tty.c_lflag |= ECHO;
     } else {
         tty.c_lflag &= ~(ECHO);
     }
-    tty.c_lflag &= ~ECHOE;   // Turn off echo erase (echo erase only relevant if canonical input is active)
+    tty.c_lflag &= ~ECHOE;   // Turn off echo erase (echo erase only relevant if
+                             // canonical input is active)
     tty.c_lflag &= ~ECHONL;  //
-    tty.c_lflag &= ~ISIG;    // Disables recognition of INTR (interrupt), QUIT and SUSP (suspend) characters
+    tty.c_lflag &= ~ISIG;    // Disables recognition of INTR (interrupt), QUIT and
+                             // SUSP (suspend) characters
 
 
     // Try and use raw function call
@@ -451,8 +462,8 @@ void SerialPort::ConfigureTermios()
     if(tcsetattr(this->fileDesc, TCSANOW, &tty) != 0)
     {
         // Error occurred
-        this->sp->PrintError(SmartPrint::Ss() << "Could not apply terminal attributes for \"" << this->filePath << "\" - " << strerror(errno));
-        return;
+        this->sp->PrintError(SmartPrint::Ss() << "Could not apply terminal
+    attributes for \"" << this->filePath << "\" - " << strerror(errno)); return;
     }*/
 }
 
@@ -462,7 +473,9 @@ void SerialPort::Write(const std::string &data)
         THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ + " called but state != OPEN. Please call Open() first.");
 
     if (fileDesc_ < 0) {
-        THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ + " called but file descriptor < 0, indicating file has not been opened.");
+        THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ +
+                     " called but file descriptor < 0, indicating file has not "
+                     "been opened.");
     }
 
     int writeResult = write(fileDesc_, data.c_str(), data.size());
@@ -479,7 +492,9 @@ void SerialPort::WriteBinary(const std::vector<uint8_t> &data)
         THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ + " called but state != OPEN. Please call Open() first.");
 
     if (fileDesc_ < 0) {
-        THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ + " called but file descriptor < 0, indicating file has not been opened.");
+        THROW_EXCEPT(std::string() + __PRETTY_FUNCTION__ +
+                     " called but file descriptor < 0, indicating file has not "
+                     "been opened.");
     }
 
     int writeResult = write(fileDesc_, data.data(), data.size());
@@ -495,9 +510,12 @@ void SerialPort::Read(std::string &data)
     data.clear();
 
     if (fileDesc_ == 0) {
-        // this->sp->PrintError(SmartPrint::Ss() << "Read() was called but file descriptor (fileDesc) was 0, indicating file has not been opened.");
+        // this->sp->PrintError(SmartPrint::Ss() << "Read() was called but file
+        // descriptor (fileDesc) was 0, indicating file has not been opened.");
         // return false;
-        THROW_EXCEPT("Read() was called but file descriptor (fileDesc) was 0, indicating file has not been opened.");
+        THROW_EXCEPT(
+            "Read() was called but file descriptor (fileDesc) was 0, "
+            "indicating file has not been opened.");
     }
 
     // Allocate memory for read buffer
@@ -505,9 +523,9 @@ void SerialPort::Read(std::string &data)
     //		memset (&buf, '\0', sizeof buf);
 
     // Read from file
-    // We provide the underlying raw array from the readBuffer_ vector to this C api.
-    // This will work because we do not delete/resize the vector while this method
-    // is called
+    // We provide the underlying raw array from the readBuffer_ vector to this C
+    // api. This will work because we do not delete/resize the vector while this
+    // method is called
     ssize_t n = read(fileDesc_, &readBuffer_[0], readBufferSize_B_);
 
     // Error Handling
@@ -521,7 +539,8 @@ void SerialPort::Read(std::string &data)
         // printf("%s\r\n", buf);
         //			data.append(buf);
         data = std::string(&readBuffer_[0], n);
-        // std::cout << *str << " and size of string =" << str->size() << "\r\n";
+        // std::cout << *str << " and size of string =" << str->size() <<
+        // "\r\n";
     }
 
     // If code reaches here, read must of been successful
@@ -532,15 +551,18 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
     data.clear();
 
     if (fileDesc_ == 0) {
-        // this->sp->PrintError(SmartPrint::Ss() << "Read() was called but file descriptor (fileDesc) was 0, indicating file has not been opened.");
+        // this->sp->PrintError(SmartPrint::Ss() << "Read() was called but file
+        // descriptor (fileDesc) was 0, indicating file has not been opened.");
         // return false;
-        THROW_EXCEPT("Read() was called but file descriptor (fileDesc) was 0, indicating file has not been opened.");
+        THROW_EXCEPT(
+            "Read() was called but file descriptor (fileDesc) was 0, "
+            "indicating file has not been opened.");
     }
 
     // Read from file
-    // We provide the underlying raw array from the readBuffer_ vector to this C api.
-    // This will work because we do not delete/resize the vector while this method
-    // is called
+    // We provide the underlying raw array from the readBuffer_ vector to this C
+    // api. This will work because we do not delete/resize the vector while this
+    // method is called
     ssize_t n = read(fileDesc_, &readBuffer_[0], readBufferSize_B_);
 
     // Error Handling
@@ -558,7 +580,8 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
 
 // termios SerialPort::GetTermios() {
 //     if(fileDesc_ == -1)
-//         throw std::runtime_error("GetTermios() called but file descriptor was not valid.");
+//         throw std::runtime_error("GetTermios() called but file descriptor was
+//         not valid.");
 
 // 	struct termios tty;
 // 	memset(&tty, 0, sizeof(tty));
@@ -567,8 +590,9 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
 // 	if(tcgetattr(fileDesc_, &tty) != 0)
 // 	{
 // 		// Error occurred
-// 		std::cout << "Could not get terminal attributes for \"" << device_ << "\" - " << strerror(errno) << std::endl;
-// 		throw std::system_error(EFAULT, std::system_category());
+// 		std::cout << "Could not get terminal attributes for \"" << device_ << "\" -
+// " << strerror(errno) << std::endl; 		throw std::system_error(EFAULT,
+// std::system_category());
 // 		//return false;
 // 	}
 
@@ -583,8 +607,9 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
 // 	if(tcsetattr(fileDesc_, TCSANOW, &myTermios) != 0)
 // 	{
 // 		// Error occurred
-// 		std::cout << "Could not apply terminal attributes for \"" << device_ << "\" - " << strerror(errno) << std::endl;
-// 		throw std::system_error(EFAULT, std::system_category());
+// 		std::cout << "Could not apply terminal attributes for \"" << device_ << "\"
+// - " << strerror(errno) << std::endl; 		throw std::system_error(EFAULT,
+// std::system_category());
 
 // 	}
 

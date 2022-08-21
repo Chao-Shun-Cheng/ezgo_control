@@ -1,11 +1,10 @@
 ///
 /// \file 				Exception.hpp
-/// \author 			Geoffrey Hunter (www.mbedded.ninja) <gbmhunter@gmail.com>
-/// \edited             n/a
-/// \created			2017-11-09
+/// \author 			Geoffrey Hunter (www.mbedded.ninja)
+/// <gbmhunter@gmail.com> \edited             n/a \created			2017-11-09
 /// \last-modified		2017-11-27
-/// \brief 				Contains the Exception class. File originally from https://github.com/mbedded-ninja/CppUtils.
-/// \details
+/// \brief 				Contains the Exception class. File originally from
+/// https://github.com/mbedded-ninja/CppUtils. \details
 ///		See README.md in root dir for more info.
 
 #ifndef MN_CPP_LINUX_SERIAL_EXCEPTION_H_

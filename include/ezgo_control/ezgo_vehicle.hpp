@@ -1,9 +1,14 @@
+/*
+ *  Copyright (C) MECLAB in National Cheng Kung University, Taiwan.
+ *  All rights reserved.
+ */
+
 #include <math.h>
-#include <chrono>
 #include <pthread.h>
 #include <ros/ros.h>
 #include <signal.h>
 #include <unistd.h>
+#include <chrono>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -16,8 +21,8 @@
 #include <tablet_socket_msgs/gear_cmd.h>
 #include <tablet_socket_msgs/mode_cmd.h>
 
-#define KMH_TO_MS 3.6 // [km/hr] -> [m/s]
-#define CHANGE_SHIFT_TIME 3 // [sec]
+#define KMH_TO_MS 3.6       /* [km/hr] -> [m/s] */
+#define CHANGE_SHIFT_TIME 3 /* [sec] */
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -29,6 +34,7 @@
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
 
+/* Define value meaning. */
 enum HeadLight { OFF = 0, ON = 1 };
 
 enum TurningLight { NONE = 0, LEFT = 1, RIGHT = 2, BOTH = 3 };
@@ -37,6 +43,10 @@ enum Shift { PARKING = 0, REVERSE = 1, NEUTRAL = 2, DRIVE = 3 };
 
 enum Mode { MANUAL = 0, AUTONOMOUS = 1, OVERRIDE = 2, CARINIT = 3 };
 
+/*
+ * Vehicle configuration.
+ * These are defined by yaml file in config folder.
+ */
 typedef struct vehicle_config {
     float length;
     float hight;
@@ -50,6 +60,11 @@ typedef struct vehicle_config {
     std::string steering_port;
 } vehicle_config_t;
 
+/*
+ * Vehicle information in real-time.
+ * These are provided by CANBus or serial port.
+ * [VCU] --> [IPC]
+ */
 typedef struct vehicle_info {
     int throttle;
     int brake;
@@ -61,11 +76,16 @@ typedef struct vehicle_info {
     int turninglight;
 } vehicle_info_t;
 
+/*
+ * Vehicle command in real-time.
+ * These are send by CANBus or serial port to control vehicle.
+ * [IPC] --> [VCU]
+ */
 typedef struct vehicle_cmd {
     double linear_x;
     double angular_z;
     int modeValue;  // 0 : manual, 1 : auto pilot, 2 : UI direct control
-    int shift;      // 0 : Forward, 1 : Reverse
+    int shift;
     int accel_stroke;
     int brake_stroke;
     int steering_angle;
@@ -73,6 +93,7 @@ typedef struct vehicle_cmd {
     int turninglight;
 } vehicle_cmd_t;
 
+/* Declare in ecu_control.cpp or arduino.cpp. */
 extern vehicle_cmd_t vehicle_cmd;
 extern vehicle_info_t vehicle_info;
 extern vehicle_config_t vehicle_config;
@@ -92,11 +113,12 @@ bool loading_vehicle_config()
     private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
     if (vehicle_config.wheel_angle_max != 0)
         vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
-    else 
+    else
         return false;
     return true;
 }
 
+/* Reset vehicle command. */
 void cmd_reset()
 {
     vehicle_cmd.linear_x = 0;
@@ -110,6 +132,7 @@ void cmd_reset()
     vehicle_cmd.turninglight = 0;
 }
 
+/* Check vehicle command update or not. */
 bool update_cmd(vehicle_cmd_t &prev_vehicle_cmd)
 {
     if (vehicle_cmd.linear_x != prev_vehicle_cmd.linear_x)
@@ -133,6 +156,7 @@ bool update_cmd(vehicle_cmd_t &prev_vehicle_cmd)
     return false;
 }
 
+/* Callback function. */
 void modeCMDCallback(const tablet_socket_msgs::mode_cmd &mode)
 {
     if (mode.mode == -1 || mode.mode == 0) {
@@ -167,31 +191,39 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
     vehicle_cmd.brake_stroke = brake.brake + vehicle_config.brake_offset;
 }
 
+/*
+ * Check if want to change shift.
+ * If current velocity direction is not same as command velocity direction and
+ * current velocity is not equal to zero, the command direction would be changed
+ * to current direction and command velocity would be changed to scale 0.5 of
+ * command velocity.
+ *
+ * @CHANGE_SHIFT_TIME: the waitting time for change shift.
+ */
 void CheckShift()
 {
-    static bool wait_for_change_shift = false;
-    if (vehicle_info.velocity != 0 && ((vehicle_info.shift == DRIVE && vehicle_cmd.linear_x < 0) || (vehicle_info.shift == REVERSE && vehicle_cmd.linear_x > 0))) {
-        wait_for_change_shift = true;
-        vehicle_cmd.linear_x = vehicle_info.velocity > 1 ? vehicle_info.velocity / 2 : 0;
-    }
-    if (wait_for_change_shift && vehicle_info.velocity == 0) {
-        ros::Time start = ros::Time::now();
-        while (1) {
-            if (ros::Time::now().toSec() - start.toSec() > CHANGE_SHIFT_TIME)
-                break;
+    if ((vehicle_info.shift == DRIVE && vehicle_cmd.linear_x < 0) || (vehicle_info.shift == REVERSE && vehicle_cmd.linear_x > 0)) {
+        if (vehicle_info.velocity != 0) {
+            vehicle_cmd.linear_x = vehicle_info.velocity > 1 ? vehicle_info.velocity / 2 : 0;
+        } else {
+            ros::Time start = ros::Time::now();
+            while (1) {
+                if (ros::Time::now().toSec() - start.toSec() > CHANGE_SHIFT_TIME)
+                    break;
+            }
         }
-        wait_for_change_shift = false;
     }
+
     if (vehicle_cmd.linear_x < 0)
         vehicle_cmd.shift = REVERSE;
     else if (vehicle_cmd.linear_x == 0)
         vehicle_cmd.shift = PARKING;
-    else    
+    else
         vehicle_cmd.shift = DRIVE;
     return;
 }
 
-void SteeringControl() 
+void SteeringControl()
 {
     static float pre_cmd_steering_angle = 0.0;
     if (vehicle_cmd.linear_x < 0.1) {
@@ -206,12 +238,12 @@ void SteeringControl()
     return;
 }
 
-void PedalControl(const double cmd_velocity, const double current_velocity) 
+void PedalControl(const double cmd_velocity, const double current_velocity)
 {
     // TODO
 }
 
-void vehicle_control() 
+void vehicle_control()
 {
     CheckShift();
     SteeringControl();
@@ -219,16 +251,22 @@ void vehicle_control()
     return;
 }
 
-void checkRange() 
+void checkRange()
 {
-    if (vehicle_cmd.steering_angle < -vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = -vehicle_config.steering_angle_max;
-    else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max) vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
-    
-    if (vehicle_cmd.brake_stroke < 0) vehicle_cmd.brake_stroke = 0;
-    else if (vehicle_cmd.brake_stroke > 255) vehicle_cmd.brake_stroke = 255;
+    if (vehicle_cmd.steering_angle < -vehicle_config.steering_angle_max)
+        vehicle_cmd.steering_angle = -vehicle_config.steering_angle_max;
+    else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max)
+        vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
 
-    if (vehicle_cmd.accel_stroke < 0) vehicle_cmd.accel_stroke = 0;
-    else if (vehicle_cmd.accel_stroke > 255) vehicle_cmd.accel_stroke = 255;
+    if (vehicle_cmd.brake_stroke < 0)
+        vehicle_cmd.brake_stroke = 0;
+    else if (vehicle_cmd.brake_stroke > 255)
+        vehicle_cmd.brake_stroke = 255;
+
+    if (vehicle_cmd.accel_stroke < 0)
+        vehicle_cmd.accel_stroke = 0;
+    else if (vehicle_cmd.accel_stroke > 255)
+        vehicle_cmd.accel_stroke = 255;
 
     if (vehicle_cmd.shift < 0 || vehicle_cmd.shift > 3) {
         vehicle_cmd.shift = 0;
@@ -286,7 +324,7 @@ void showVehicleInfo()
     std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
     std::cout << "Brake : " << vehicle_info.brake << std::endl;
     std::cout << "Steering Angle : " << vehicle_info.steering_angle << std::endl;
-    std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]"<< std::endl;
+    std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]" << std::endl;
 
     switch (vehicle_info.headlight) {
     case OFF:

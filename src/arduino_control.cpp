@@ -108,7 +108,7 @@ int main(int argc, char **argv)
         ROS_ERROR("Can't load vehicle config!");
         return 0;
     }
-    
+
     ros::Subscriber sub[6];
     sub[0] = nh.subscribe("/twist_cmd", 1, twistCMDCallback);
     sub[1] = nh.subscribe("/mode_cmd", 1, modeCMDCallback);
