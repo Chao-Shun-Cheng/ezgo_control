@@ -81,15 +81,15 @@ extern int willExit;
 bool loading_vehicle_config()
 {
     ros::NodeHandle private_nh_("~");
-    private_nh_.param<float>("/vehicle_config/length", vehicle_config.length, 2.4);
-    private_nh_.param<float>("/vehicle_config/hight", vehicle_config.hight, 1.74);
-    private_nh_.param<float>("/vehicle_config/width", vehicle_config.width, 0.97);
-    private_nh_.param<float>("/vehicle_config/wheel_base", vehicle_config.wheel_base, 1.67);
-    private_nh_.param<float>("/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
-    private_nh_.param<float>("/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
-    private_nh_.param<int>("/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
-    private_nh_.param<std::string>("/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
-    private_nh_.param<int>("/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/length", vehicle_config.length, 2.4);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/hight", vehicle_config.hight, 1.74);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/width", vehicle_config.width, 0.97);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/wheel_base", vehicle_config.wheel_base, 1.67);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
+    private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
+    private_nh_.param<std::string>("/ecu_ezgo_vehicle_control/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
+    private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
     if (vehicle_config.wheel_angle_max != 0)
         vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
     else 
