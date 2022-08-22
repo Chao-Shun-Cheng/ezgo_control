@@ -77,10 +77,12 @@ canStatus Kvaser_canbus_write()
 
 void serial_steering_write(SerialPort *serialPort)
 {
+    static ros::Rate rate(50);
     int pulse = (int) (vehicle_cmd.steering_angle / pulse_to_degree);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
     serialPort->Write(angle_write(std::to_string(pulse)));
+    rate.sleep();
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
@@ -97,11 +99,13 @@ void serial_steering_write(SerialPort *serialPort)
 
 void serial_steering_read(SerialPort *serialPort)
 {
+    static ros::Rate rate(50);
     bool findEnd = false;
     int sign = 0;
     int pluse = 0;
     pthread_mutex_lock(&mutex);
     serialPort->Write("rabs@");
+    rate.sleep();
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
@@ -126,9 +130,11 @@ void serial_steering_read(SerialPort *serialPort)
 
 void hold_steering(SerialPort *serialPort)
 {
+    static ros::Rate rate(50);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
     serialPort->Write("hold 0@");
+    rate.sleep();
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
@@ -145,9 +151,11 @@ void hold_steering(SerialPort *serialPort)
 
 void free_steering(SerialPort *serialPort)
 {
+    static ros::Rate rate(50);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
     serialPort->Write("hold 1@");
+    rate.sleep();
     while (serialPort->Available() && !findEnd) {
         std::string readData;
         serialPort->Read(readData);
@@ -169,16 +177,21 @@ static void *CAN_SERIAL_Info_Sender(void *args)
 
     SerialPort *serialPort = (SerialPort *) args;
     vehicle_cmd_t prev_vehicle_cmd;
+    int prev_control_mode = vehicle_info.control_mode;
+    bool change_mode = false;
     ros::Rate rate(50);
     cmd_reset();
 
     while (ros::ok() && !willExit) {
         ros::spinOnce();
+        change_mode = prev_control_mode == vehicle_info.control_mode;
+        prev_control_mode = vehicle_info.control_mode;
         if (update_cmd(prev_vehicle_cmd)) {
             switch (vehicle_cmd.modeValue) {
             case 0:
                 free_steering(serialPort);
                 cmd_reset();
+                Kvaser_canbus_write();
                 break;
             case 1:  // autonomous mode
                 if (vehicle_info.control_mode == AUTONOMOUS) {
@@ -190,10 +203,12 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                 } else {
                     std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
                 }
-
                 break;
             case 2:  // UI direct control
                 if (vehicle_info.control_mode == AUTONOMOUS) {
+                    if (change_mode) {
+                        cmd_reset();
+                    }
                     checkRange();
                     Kvaser_canbus_write();
                     hold_steering(serialPort);

@@ -3,7 +3,7 @@ vehicle_config:
   hight: 1.74
   width: 0.97
   wheel_base: 1.67
-  wheel_angle_max: 0.589
-  steering_angle_max: 7.718
-  steering_offset: 1024 # 0x400
+  wheel_angle_max: 33.747     # [degrees]
+  steering_angle_max: 442.208 # [degrees]
+  steering_offset: 1024       # 0x400
   brake_offset: 22
