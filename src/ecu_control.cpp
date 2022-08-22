@@ -21,7 +21,6 @@ using namespace mn::CppLinuxSerial;
  */
 #define pulse_to_degree 0.009375
 #define angle_write(pluse) ("abs " + pluse + "@")
-#define sleep_time 0.5
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -163,10 +162,10 @@ void free_steering(SerialPort *serialPort)
     return;
 }
 
-static void *CAN_Info_Sender(void *args)
+static void *CAN_SERIAL_Info_Sender(void *args)
 {
-    std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Sender thread." << RESET << std::endl;
-    std::cout << GREEN << "[ezgo_control::CAN_Info_Sender] can open done." << RESET << std::endl;
+    std::cout << YELLOW << "ENTER ezgo_control CAN_SERIAL_Info_Sender thread." << RESET << std::endl;
+    std::cout << GREEN << "[ezgo_control::CAN_SERIAL_Info_Sender] can open done." << RESET << std::endl;
 
     SerialPort *serialPort = (SerialPort *) args;
     vehicle_cmd_t prev_vehicle_cmd;
@@ -213,10 +212,22 @@ static void *CAN_Info_Sender(void *args)
     return nullptr;
 }
 
+static void *SERIAL_Info_Receiver(void *args)
+{
+    std::cout << YELLOW << "ENTER ezgo_control SERIAL_Info_Receiver thread." << RESET << std::endl;
+    SerialPort *serialPort = (SerialPort *) args;
+    ros::Rate rate(50);
+    while (ros::ok() && !willExit) {
+        serial_steering_read(serialPort);
+        rate.sleep();
+    }
+    std::cout << YELLOW << "EXIT ezgo_control SERIAL_Info_Receiver thread." << RESET << std::endl;
+    return nullptr;
+}
+
 static void *CAN_Info_Receiver(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
-    SerialPort *serialPort = (SerialPort *) args;
     canHandle hnd = -1;
     canStatus stat;
     long id;
@@ -235,7 +246,7 @@ static void *CAN_Info_Receiver(void *args)
     checkCAN("canSetBusParams", stat);
     canBusOn(hnd);
     std::cout << GREEN << "[ezgo_control::CAN_Info_Receiver] can open done, Channel " << CAN_CHANNEL << RESET << std::endl;
-    ros::Rate rate(50);
+    
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
@@ -253,9 +264,7 @@ static void *CAN_Info_Receiver(void *args)
                 vehicle_info.velocity /= 1000.0;
             }
         }
-        serial_steering_read(serialPort);
         showVehicleInfo();
-        rate.sleep();
     }
     std::cout << YELLOW << "EXIT ezgo_control CAN_Info_Receiver thread." << RESET << std::endl;
     return nullptr;
@@ -305,25 +314,36 @@ int main(int argc, char **argv)
     sub[4] = nh.subscribe("/steer_cmd", 1, steerCMDCallback);
     sub[5] = nh.subscribe("/brake_cmd", 1, brakeCMDCallback);
 
-    pthread_t thread_writer;
-    pthread_t thread_reader;
+    pthread_t thread_CAN_SERIAL_writer;
+    pthread_t thread_CAN_reader;
+    pthread_t thread_SERIAL_reader;
 
-    if (pthread_create(&thread_writer, NULL, CAN_Info_Sender, &serialPort)) {
+    if (pthread_create(&thread_CAN_SERIAL_writer, NULL, CAN_SERIAL_Info_Sender, &serialPort)) {
         perror("could not create thread for CAN_Info_Sender");
         return -1;
     }
 
-    if (pthread_create(&thread_reader, NULL, CAN_Info_Receiver, &serialPort)) {
+    if (pthread_create(&thread_CAN_reader, NULL, CAN_Info_Receiver, NULL)) {
         perror("could not create thread for CAN_Info_Receiver");
         return -1;
     }
 
-    if (pthread_detach(thread_writer) != 0) {
+    if (pthread_create(&thread_SERIAL_reader, NULL, SERIAL_Info_Receiver, &serialPort)) {
+        perror("could not create thread for CAN_Info_Receiver");
+        return -1;
+    }
+
+    if (pthread_detach(thread_CAN_SERIAL_writer) != 0) {
         std::perror("pthread_detach");
         std::exit(1);
     }
 
-    if (pthread_detach(thread_reader) != 0) {
+    if (pthread_detach(thread_CAN_reader) != 0) {
+        std::perror("pthread_detach");
+        std::exit(1);
+    }
+
+    if (pthread_detach(thread_SERIAL_reader) != 0) {
         std::perror("pthread_detach");
         std::exit(1);
     }
