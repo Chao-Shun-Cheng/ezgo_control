@@ -169,18 +169,23 @@ static void *CAN_SERIAL_Info_Sender(void *args)
 
     SerialPort *serialPort = (SerialPort *) args;
     vehicle_cmd_t prev_vehicle_cmd;
+    int prev_control_mode = vehicle_info.control_mode;
+    bool change_mode = false;
     ros::Rate rate(50);
     cmd_reset();
 
     while (ros::ok() && !willExit) {
         ros::spinOnce();
-        if (update_cmd(prev_vehicle_cmd)) {
+        change_mode = prev_control_mode == vehicle_info.control_mode;
+        prev_control_mode = vehicle_info.control_mode;
+        if (update_cmd(prev_vehicle_cmd) || change_mode) {
             switch (vehicle_cmd.modeValue) {
             case 0:
                 free_steering(serialPort);
                 cmd_reset();
+                Kvaser_canbus_write();
                 break;
-            case 1:  // autonomous mode
+            case 1:  // autonomous driving control
                 if (vehicle_info.control_mode == AUTONOMOUS) {
                     vehicle_control();
                     checkRange();
@@ -188,9 +193,9 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                     hold_steering(serialPort);
                     serial_steering_write(serialPort);
                 } else {
+                    free_steering(serialPort);
                     std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
                 }
-
                 break;
             case 2:  // UI direct control
                 if (vehicle_info.control_mode == AUTONOMOUS) {
@@ -199,6 +204,7 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                     hold_steering(serialPort);
                     serial_steering_write(serialPort);
                 } else {
+                    free_steering(serialPort);
                     std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
                 }
                 break;
