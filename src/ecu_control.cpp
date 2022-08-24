@@ -304,6 +304,8 @@ int main(int argc, char **argv)
     if (!loading_vehicle_config()) {
         ROS_ERROR("Can't load vehicle config!");
         return 0;
+    } else {
+        showConfig();
     }
 
     SerialPort serialPort(vehicle_config.steering_port, BaudRate::B_115200, NumDataBits::EIGHT, Parity::NONE, NumStopBits::ONE);

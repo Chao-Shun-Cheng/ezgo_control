@@ -23,6 +23,7 @@
 
 #define KMH_TO_MS 3.6       /* [km/hr] -> [m/s] */
 #define CHANGE_SHIFT_TIME 3 /* [sec] */
+#define VELOCITY_BUFFER 1.5
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -57,6 +58,7 @@ typedef struct vehicle_config {
     int steering_offset;
     int brake_offset;
     double wheel_to_steering;
+    float max_velocity;
     std::string steering_port;
 } vehicle_config_t;
 
@@ -109,6 +111,9 @@ bool loading_vehicle_config()
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
     private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/max_velocity", vehicle_config.max_velocity, 30);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/profile_a", vehicle_config.profile_a, 0.1989);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/profile_b", vehicle_config.profile_b, -8.9443);
     private_nh_.param<std::string>("/ecu_ezgo_vehicle_control/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
     private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
     if (vehicle_config.wheel_angle_max != 0)
@@ -116,6 +121,25 @@ bool loading_vehicle_config()
     else
         return false;
     return true;
+}
+
+void showConfig() 
+{
+    std::cout << CYAN << "------- Vehicle Config -------" << std::endl;
+    std::cout << "vehicle_config.length : " << vehicle_config.length << "[m]" << std::endl;
+    std::cout << "vehicle_config.hight : " << vehicle_config.hight << "[m]" << std::endl;
+    std::cout << "vehicle_config.width : " << vehicle_config.width << "[m]" << std::endl;
+    std::cout << "vehicle_config.wheel_base : " << vehicle_config.wheel_base << "[m]" << std::endl;
+    std::cout << "vehicle_config.wheel_angle_max : " << vehicle_config.wheel_angle_max << "[degrees]" << std::endl;
+    std::cout << "vehicle_config.steering_angle_max : " << vehicle_config.steering_angle_max << "[degrees]" << std::endl;
+    std::cout << "vehicle_config.max_velocity : " << vehicle_config.max_velocity << "[km/hr]" << std::endl;
+    std::cout << "vehicle_config.steering_port : " << vehicle_config.steering_port << std::endl;
+    std::cout << "vehicle_config.profile_a : " << vehicle_config.profile_a << std::endl;
+    std::cout << "vehicle_config.profile_b : " << vehicle_config.profile_b << std::endl;
+    std::cout << "vehicle_config.steering_offset : " << vehicle_config.steering_offset << std::endl;
+    std::cout << "vehicle_config.brake_offset : " << vehicle_config.brake_offset << std::endl;
+    std::cout << "------- Vehicle Config -------" << RESET << std::endl;
+    return;
 }
 
 /* Reset vehicle command. */
@@ -240,7 +264,18 @@ void SteeringControl()
 
 void PedalControl(const double cmd_velocity, const double current_velocity)
 {
-    // TODO
+    if (cmd_velocity > vehicle_config.max_velocity) cmd_velocity = vehicle_config.max_velocity; 
+    if ((cmd_velocity + VELOCITY_BUFFER) > current_velocity && cmd_velocity != 0) {        /* acceleration */
+        vehicle_cmd.accel_stroke = (cmd_velocity - vehicle_config.profile_b) / vehicle_config.profile_a;
+        vehicle_cmd.brake_stroke = 0;
+    } else if ((cmd_velocity + VELOCITY_BUFFER) < current_velocity && cmd_velocity > 0) {  /* deceleration */
+        vehicle_cmd.accel_stroke = 0;
+        vehicle_cmd.brake_stroke = 40;
+    } else if (cmd_velocity == 0 && current_velocity != 0) {                               /* stopping */
+        vehicle_cmd.accel_stroke = 0;
+        vehicle_cmd.brake_stroke = 80;
+    }
+    return;
 }
 
 void vehicle_control()

@@ -6,4 +6,10 @@ vehicle_config:
   wheel_angle_max: 33.747     # [degrees]
   steering_angle_max: 442.208 # [degrees]
   steering_offset: 1024       # 0x400
+  max_velocity: 30            # [km/hr]
   brake_offset: 22
+  # velocity profile can be fitted by inclined line ( y = ax + b)
+  # x means throttle percentage [0 - 255]
+  # y means terminal velocity [km/hr]
+  profile_a: 0.1989
+  profile_b: -8.9443
