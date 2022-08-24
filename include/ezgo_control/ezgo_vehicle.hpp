@@ -59,6 +59,8 @@ typedef struct vehicle_config {
     int brake_offset;
     double wheel_to_steering;
     float max_velocity;
+    float profile_a;
+    float profile_b;
     std::string steering_port;
 } vehicle_config_t;
 
@@ -262,7 +264,7 @@ void SteeringControl()
     return;
 }
 
-void PedalControl(const double cmd_velocity, const double current_velocity)
+void PedalControl(double cmd_velocity, const double current_velocity)
 {
     if (cmd_velocity > vehicle_config.max_velocity) cmd_velocity = vehicle_config.max_velocity; 
     if ((cmd_velocity + VELOCITY_BUFFER) > current_velocity && cmd_velocity != 0) {        /* acceleration */
