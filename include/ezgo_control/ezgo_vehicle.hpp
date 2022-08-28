@@ -329,22 +329,25 @@ void checkRange()
 
 void showVehicleInfo()
 {
-    switch (vehicle_info.control_mode) {
-    case MANUAL:
-        std::cout << GREEN << "------ manual mode ------" << RESET << std::endl;
-        break;
-    case AUTONOMOUS:
-        std::cout << YELLOW << "------ autonomous mode ------" << RESET << std::endl;
-        break;
-    case OVERRIDE:
-        std::cout << BLUE << "------ override mode ------" << RESET << std::endl;
-        break;
-    case CARINIT:
-        std::cout << RED << "------ car init mode ------" << RESET << std::endl;
-        break;
-    default:
-        break;
-    }
+    if (vehicle_info.control_mode == MANUAL && vehicle_cmd.modeValue == 0) {
+        std::cout << YELLOW << "------ Manual mode ------" << RESET << std::endl;
+    } else if (vehicle_info.control_mode == AUTONOMOUS && vehicle_cmd.modeValue == 1) {
+        std::cout << GREEN << "------ Autonomous mode ------" << RESET << std::endl;
+    } else if (vehicle_info.control_mode == AUTONOMOUS && vehicle_cmd.modeValue == 2) {
+        std::cout << GREEN << "------ UI direct control mode ------" << RESET << std::endl;
+    } else {
+        std::cout << RED << "------ Error mode ------" << RESET << std::endl;
+        if (vehicle_info.control_mode == MANUAL)
+            std::cout << "Exteral Switch : OFF [Maunal mode]" << std::endl;
+        else
+            std::cout << "Exteral Switch : ON [Autonomous mode]" << std::endl;
+        if (vehicle_cmd.modeValue == 0)
+            std::cout << "Software Control Value : 0 [Manual mode]" << std::endl;
+        else if (vehicle_cmd.modeValue == 1)
+            std::cout << "Software Control Value : 1 [Autonomous mode]" << std::endl;
+        else
+            std::cout << "Software Control Value : 2 [UI direct control mode]" << std::endl;
+    } 
 
     switch (vehicle_info.shift) {
     case PARKING:
@@ -362,10 +365,10 @@ void showVehicleInfo()
     default:
         break;
     }
-
-    std::cout << "Throttle : " << vehicle_info.throttle << std::endl;
-    std::cout << "Brake : " << vehicle_info.brake << std::endl;
-    std::cout << "Steering Angle : " << vehicle_info.steering_angle << std::endl;
+    
+    std::cout << "Throttle [CMD] : " << vehicle_cmd.accel_stroke << ", Throttle : " << vehicle_info.throttle << std::endl;
+    std::cout << "Brake [CMD] : " << vehicle_cmd.brake_stroke << ", Brake : " << vehicle_info.brake << std::endl;
+    std::cout << "Steering Angle [CMD] : " << vehicle_cmd.steering_angle << ", Steering Angle : " << vehicle_info.steering_angle << std::endl;
     std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]" << std::endl;
 
     switch (vehicle_info.headlight) {
