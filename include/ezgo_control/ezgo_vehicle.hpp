@@ -23,7 +23,7 @@
 
 #define KMH_TO_MS 3.6       /* [km/hr] -> [m/s] */
 #define CHANGE_SHIFT_TIME 3 /* [sec] */
-#define VELOCITY_BUFFER 1.5
+#define VELOCITY_BUFFER 3   /* [km/hr] */
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -43,6 +43,8 @@ enum TurningLight { NONE = 0, LEFT = 1, RIGHT = 2, BOTH = 3 };
 enum Shift { PARKING = 0, REVERSE = 1, NEUTRAL = 2, DRIVE = 3 };
 
 enum Mode { MANUAL = 0, AUTONOMOUS = 1, OVERRIDE = 2, CARINIT = 3 };
+
+enum SteeringStatus { STEERINGINIT = 0, STEERINGFREE = 1, STEERINGHOLD = 2 };
 
 /*
  * Vehicle configuration.
@@ -256,7 +258,7 @@ void SteeringControl()
         vehicle_cmd.steering_angle = pre_cmd_steering_angle;
     } else {
         double phi_angle_pi = (vehicle_cmd.angular_z / vehicle_cmd.linear_x);
-        double wheel_angle_pi = phi_angle_pi * vehicle_config.wheel_base;
+        double wheel_angle_pi = atan(phi_angle_pi * vehicle_config.wheel_base);
         double wheel_angle = (wheel_angle_pi / M_PI) * 180.0;
         vehicle_cmd.steering_angle = wheel_angle * vehicle_config.wheel_to_steering;
         pre_cmd_steering_angle = vehicle_cmd.steering_angle;
@@ -268,12 +270,15 @@ void PedalControl(double cmd_velocity, const double current_velocity)
 {
     if (cmd_velocity > vehicle_config.max_velocity) cmd_velocity = vehicle_config.max_velocity; 
     if ((cmd_velocity + VELOCITY_BUFFER) > current_velocity && cmd_velocity != 0) {        /* acceleration */
+        std::cout << BLUE << "ACCELERATION" << RESET << std::endl;
         vehicle_cmd.accel_stroke = (cmd_velocity - vehicle_config.profile_b) / vehicle_config.profile_a;
         vehicle_cmd.brake_stroke = 0;
     } else if ((cmd_velocity + VELOCITY_BUFFER) < current_velocity && cmd_velocity > 0) {  /* deceleration */
+        std::cout << RED << "DECELERATION" << RESET << std::endl;
         vehicle_cmd.accel_stroke = 0;
         vehicle_cmd.brake_stroke = 40;
     } else if (cmd_velocity == 0 && current_velocity != 0) {                               /* stopping */
+        std::cout << RED << "STOPPING" << RESET << std::endl;
         vehicle_cmd.accel_stroke = 0;
         vehicle_cmd.brake_stroke = 80;
     }
@@ -284,7 +289,7 @@ void vehicle_control()
 {
     CheckShift();
     SteeringControl();
-    PedalControl(fabs(vehicle_cmd.linear_x), vehicle_info.velocity / KMH_TO_MS);
+    PedalControl(fabs(vehicle_cmd.linear_x) * KMH_TO_MS, vehicle_info.velocity);
     return;
 }
 
@@ -295,8 +300,8 @@ void checkRange()
     else if (vehicle_cmd.steering_angle > vehicle_config.steering_angle_max)
         vehicle_cmd.steering_angle = vehicle_config.steering_angle_max;
 
-    if (vehicle_cmd.brake_stroke < 0)
-        vehicle_cmd.brake_stroke = 0;
+    if (vehicle_cmd.brake_stroke < vehicle_config.brake_offset)
+        vehicle_cmd.brake_stroke = vehicle_config.brake_offset;
     else if (vehicle_cmd.brake_stroke > 255)
         vehicle_cmd.brake_stroke = 255;
 

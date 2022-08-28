@@ -8,7 +8,7 @@ vehicle_config:
   steering_offset: 1024       # 0x400
   max_velocity: 30            # [km/hr]
   brake_offset: 22
-  # velocity profile can be fitted by inclined line ( y = ax + b)
+  # velocity profile can be fitted by inclined line ( y = ax + b )
   # x means throttle percentage [0 - 255]
   # y means terminal velocity [km/hr]
   profile_a: 0.1989

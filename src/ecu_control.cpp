@@ -119,7 +119,7 @@ void serial_steering_read(SerialPort *serialPort)
         }
     }
     pthread_mutex_unlock(&mutex);
-    if (findEnd)
+    if (findEnd && sign != 0)
         vehicle_info.steering_angle = sign * pluse * pulse_to_degree;
     return;
 }
@@ -168,34 +168,30 @@ static void *CAN_SERIAL_Info_Sender(void *args)
     std::cout << GREEN << "[ezgo_control::CAN_SERIAL_Info_Sender] can open done." << RESET << std::endl;
 
     SerialPort *serialPort = (SerialPort *) args;
-    vehicle_cmd_t prev_vehicle_cmd;
-    int prev_control_mode = vehicle_info.control_mode;
-    bool change_mode = false;
-    ros::Rate rate(50);
+
+    int steering_status = STEERINGINIT;
+    ros::Rate rate(10);
     cmd_reset();
 
     while (ros::ok() && !willExit) {
         ros::spinOnce();
-        change_mode = prev_control_mode == vehicle_info.control_mode;
-        prev_control_mode = vehicle_info.control_mode;
-        if (update_cmd(prev_vehicle_cmd) || change_mode) {
-            switch (vehicle_cmd.modeValue) {
-            case 0:
-                free_steering(serialPort);
-                cmd_reset();
-                Kvaser_canbus_write();
-                break;
+        switch (vehicle_cmd.modeValue) {
             case 1:  // autonomous driving control
                 if (vehicle_info.control_mode == AUTONOMOUS) {
                     vehicle_control();
                     checkRange();
                     Kvaser_canbus_write();
-                    hold_steering(serialPort);
+                    if (steering_status != STEERINGHOLD) {
+                        hold_steering(serialPort);
+                        steering_status = STEERINGHOLD;
+                    }
                     serial_steering_write(serialPort);
                 } else {
-                    free_steering(serialPort);
+                    if (steering_status != STEERINGFREE) {
+                        free_steering(serialPort);
+                        steering_status = STEERINGFREE;
+                    }
                     cmd_reset();
-                    Kvaser_canbus_write();
                     std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
                 }
                 break;
@@ -203,18 +199,29 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                 if (vehicle_info.control_mode == AUTONOMOUS) {
                     checkRange();
                     Kvaser_canbus_write();
-                    hold_steering(serialPort);
+                    if (steering_status != STEERINGHOLD) {
+                        hold_steering(serialPort);
+                        steering_status = STEERINGHOLD;
+                    }
                     serial_steering_write(serialPort);
                 } else {
-                    free_steering(serialPort);
+                    if (steering_status != STEERINGFREE) {
+                        free_steering(serialPort);
+                        steering_status = STEERINGFREE;
+                    }
                     cmd_reset();
-                    Kvaser_canbus_write();
                     std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
                 }
                 break;
-            }
-            prev_vehicle_cmd = vehicle_cmd;
+            default:
+                if (steering_status != STEERINGFREE) {
+                    free_steering(serialPort);
+                    steering_status = STEERINGFREE;
+                }
+                cmd_reset();
+                break;
         }
+        
         rate.sleep();
     }
 
@@ -226,7 +233,7 @@ static void *SERIAL_Info_Receiver(void *args)
 {
     std::cout << YELLOW << "ENTER ezgo_control SERIAL_Info_Receiver thread." << RESET << std::endl;
     SerialPort *serialPort = (SerialPort *) args;
-    ros::Rate rate(50);
+    ros::Rate rate(10);
     while (ros::ok() && !willExit) {
         serial_steering_read(serialPort);
         rate.sleep();
@@ -272,7 +279,13 @@ static void *CAN_Info_Receiver(void *args)
                 vehicle_info.control_mode = msg[0];
                 vehicle_info.velocity = (float) ((uint16_t)(((msg[1] << 8) & 0xff00) + msg[2]));
                 vehicle_info.velocity /= 1000.0;
-            }
+            } else if (id == 0x1) {
+                int analog_brake = (int) ((uint16_t)(((msg[0] << 8) & 0xff00) + msg[1]));
+                int analog_throttle = (int) ((uint16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
+                std::cout << "---------------" << std::endl;
+                std::cout << RED << "analog brake : " << analog_brake << RESET << std::endl;
+                std::cout << GREEN << "analog throttle : " << analog_throttle << RESET << std::endl;
+            } 
         }
         showVehicleInfo();
     }
