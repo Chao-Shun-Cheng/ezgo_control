@@ -61,7 +61,12 @@ SerialPort::SerialPort(const std::string &device, speed_t baudRate) : SerialPort
     baudRateCustom_ = baudRate;
 }
 
-SerialPort::SerialPort(const std::string &device, BaudRate baudRate, NumDataBits numDataBits, Parity parity, NumStopBits numStopBits) : SerialPort()
+SerialPort::SerialPort(const std::string &device,
+                       BaudRate baudRate,
+                       NumDataBits numDataBits,
+                       Parity parity,
+                       NumStopBits numStopBits)
+    : SerialPort()
 {
     device_ = device;
     baudRateType_ = BaudRateType::STANDARD;
@@ -590,8 +595,8 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
 // 	if(tcgetattr(fileDesc_, &tty) != 0)
 // 	{
 // 		// Error occurred
-// 		std::cout << "Could not get terminal attributes for \"" << device_ << "\" -
-// " << strerror(errno) << std::endl; 		throw std::system_error(EFAULT,
+// 		std::cout << "Could not get terminal attributes for \"" << device_ << "\"
+// - " << strerror(errno) << std::endl; 		throw std::system_error(EFAULT,
 // std::system_category());
 // 		//return false;
 // 	}
@@ -607,7 +612,8 @@ void SerialPort::ReadBinary(std::vector<uint8_t> &data)
 // 	if(tcsetattr(fileDesc_, TCSANOW, &myTermios) != 0)
 // 	{
 // 		// Error occurred
-// 		std::cout << "Could not apply terminal attributes for \"" << device_ << "\"
+// 		std::cout << "Could not apply terminal attributes for \"" << device_ <<
+// "\"
 // - " << strerror(errno) << std::endl; 		throw std::system_error(EFAULT,
 // std::system_category());
 

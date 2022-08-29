@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <ros/ros.h>
 #include <signal.h>
+#include <time.h>
 #include <unistd.h>
 #include <chrono>
 #include <iostream>
@@ -34,6 +35,28 @@
 #define MAGENTA "\033[35m" /* Magenta */
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
+
+/*
+ * Measurement time. [ns]
+ * struct timespec {
+ *     time_t tv_sec; [sec]
+ *     long   tv_nsec; [ns]
+ * };
+ */
+
+inline void GetTickCount(struct timespec &t)
+{
+    while (clock_gettime(0, &t) == -1)
+        ;
+    return;
+}
+
+inline double GetTimeDiffNow(const struct timespec &old_t)
+{
+    static struct timespec curr_t;
+    GetTickCount(curr_t);
+    return (curr_t.tv_sec - old_t.tv_sec) + ((double) (curr_t.tv_nsec - old_t.tv_nsec) / 1000000000.0); /* [sec] */
+}
 
 /* Define value meaning. */
 enum HeadLight { OFF = 0, ON = 1 };
@@ -90,7 +113,7 @@ typedef struct vehicle_info {
 typedef struct vehicle_cmd {
     double linear_x;
     double angular_z;
-    int modeValue;  // 0 : manual, 1 : auto pilot, 2 : UI direct control
+    int modeValue; /* 0 : manual, 1 : auto pilot, 2 : UI direct control */
     int shift;
     int accel_stroke;
     int brake_stroke;
@@ -113,12 +136,14 @@ bool loading_vehicle_config()
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/width", vehicle_config.width, 0.97);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/wheel_base", vehicle_config.wheel_base, 1.67);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/wheel_angle_max", vehicle_config.wheel_angle_max, 1.67);
-    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max, 1.67);
+    private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/steering_angle_max", vehicle_config.steering_angle_max,
+                             1.67);
     private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/steering_offset", vehicle_config.steering_offset, 1024);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/max_velocity", vehicle_config.max_velocity, 30);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/profile_a", vehicle_config.profile_a, 0.1989);
     private_nh_.param<float>("/ecu_ezgo_vehicle_control/vehicle_config/profile_b", vehicle_config.profile_b, -8.9443);
-    private_nh_.param<std::string>("/ecu_ezgo_vehicle_control/vehicle_config/steering_port", vehicle_config.steering_port, "/dev/ttyACM0");
+    private_nh_.param<std::string>("/ecu_ezgo_vehicle_control/vehicle_config/steering_port", vehicle_config.steering_port,
+                                   "/dev/ttyACM0");
     private_nh_.param<int>("/ecu_ezgo_vehicle_control/vehicle_config/brake_offset", vehicle_config.brake_offset, 22);
     if (vehicle_config.wheel_angle_max != 0)
         vehicle_config.wheel_to_steering = vehicle_config.steering_angle_max / vehicle_config.wheel_angle_max;
@@ -127,7 +152,7 @@ bool loading_vehicle_config()
     return true;
 }
 
-void showConfig() 
+void showConfig()
 {
     std::cout << CYAN << "------- Vehicle Config -------" << std::endl;
     std::cout << "vehicle_config.length : " << vehicle_config.length << "[m]" << std::endl;
@@ -230,7 +255,8 @@ void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
  */
 void CheckShift()
 {
-    if ((vehicle_info.shift == DRIVE && vehicle_cmd.linear_x < 0) || (vehicle_info.shift == REVERSE && vehicle_cmd.linear_x > 0)) {
+    if ((vehicle_info.shift == DRIVE && vehicle_cmd.linear_x < 0) ||
+        (vehicle_info.shift == REVERSE && vehicle_cmd.linear_x > 0)) {
         if (vehicle_info.velocity != 0) {
             vehicle_cmd.linear_x = vehicle_info.velocity > 1 ? vehicle_info.velocity / 2 : 0;
         } else {
@@ -268,16 +294,17 @@ void SteeringControl()
 
 void PedalControl(double cmd_velocity, const double current_velocity)
 {
-    if (cmd_velocity > vehicle_config.max_velocity) cmd_velocity = vehicle_config.max_velocity; 
-    if ((cmd_velocity + VELOCITY_BUFFER) > current_velocity && cmd_velocity != 0) {        /* acceleration */
+    if (cmd_velocity > vehicle_config.max_velocity)
+        cmd_velocity = vehicle_config.max_velocity;
+    if ((cmd_velocity + VELOCITY_BUFFER) > current_velocity && cmd_velocity != 0) { /* acceleration */
         std::cout << BLUE << "ACCELERATION" << RESET << std::endl;
         vehicle_cmd.accel_stroke = (cmd_velocity - vehicle_config.profile_b) / vehicle_config.profile_a;
         vehicle_cmd.brake_stroke = 0;
-    } else if ((cmd_velocity + VELOCITY_BUFFER) < current_velocity && cmd_velocity > 0) {  /* deceleration */
+    } else if ((cmd_velocity + VELOCITY_BUFFER) < current_velocity && cmd_velocity > 0) { /* deceleration */
         std::cout << RED << "DECELERATION" << RESET << std::endl;
         vehicle_cmd.accel_stroke = 0;
         vehicle_cmd.brake_stroke = 40;
-    } else if (cmd_velocity == 0 && current_velocity != 0) {                               /* stopping */
+    } else if (cmd_velocity == 0 && current_velocity != 0) { /* stopping */
         std::cout << RED << "STOPPING" << RESET << std::endl;
         vehicle_cmd.accel_stroke = 0;
         vehicle_cmd.brake_stroke = 80;
@@ -329,6 +356,9 @@ void checkRange()
 
 void showVehicleInfo()
 {
+    static struct timespec time;
+    GetTickCount(time);
+
     if (vehicle_info.control_mode == MANUAL && vehicle_cmd.modeValue == 0) {
         std::cout << YELLOW << "------ Manual mode ------" << RESET << std::endl;
     } else if (vehicle_info.control_mode == AUTONOMOUS && vehicle_cmd.modeValue == 1) {
@@ -347,7 +377,9 @@ void showVehicleInfo()
             std::cout << "Software Control Value : 1 [Autonomous mode]" << std::endl;
         else
             std::cout << "Software Control Value : 2 [UI direct control mode]" << std::endl;
-    } 
+    }
+
+    std::cout << "Time : " << time.tv_nsec << std::endl;
 
     switch (vehicle_info.shift) {
     case PARKING:
@@ -365,10 +397,11 @@ void showVehicleInfo()
     default:
         break;
     }
-    
+
     std::cout << "Throttle [CMD] : " << vehicle_cmd.accel_stroke << ", Throttle : " << vehicle_info.throttle << std::endl;
     std::cout << "Brake [CMD] : " << vehicle_cmd.brake_stroke << ", Brake : " << vehicle_info.brake << std::endl;
-    std::cout << "Steering Angle [CMD] : " << vehicle_cmd.steering_angle << ", Steering Angle : " << vehicle_info.steering_angle << std::endl;
+    std::cout << "Steering Angle [CMD] : " << vehicle_cmd.steering_angle << ", Steering Angle : " << vehicle_info.steering_angle
+              << std::endl;
     std::cout << "Velocity : " << vehicle_info.velocity << " [km/hr]" << std::endl;
 
     switch (vehicle_info.headlight) {

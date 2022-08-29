@@ -21,19 +21,23 @@ using namespace mn::CppLinuxSerial;
  */
 #define pulse_to_degree 0.009375
 #define angle_write(pluse) ("abs " + pluse + "@")
+#define wait_serial_time 0.01 /* [10 ms] */
+#define wait_serial(serial_time) while (GetTimeDiffNow(serial_time) > wait_serial_time)
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
 vehicle_cmd_t vehicle_cmd;
 vehicle_config_t vehicle_config;
 int willExit = 0;
+/* The time is used to make sure the serial write rate > 10 ms */
+static struct timespec serial_time;
 
 static void checkCAN(const char *id, canStatus stat)
 {
     if (stat != canOK) {
         char buf[50];
         buf[0] = '\0';
-        // Retreive informational text about the status code
+        /* Retreive informational text about the status code */
         canGetErrorText(stat, buf, sizeof(buf));
         std::cout << RED << id << " : failed, stat = " << (int) stat << " " << buf << RESET << std::endl;
     }
@@ -49,7 +53,7 @@ canStatus Kvaser_canbus_write()
     msg[5] = vehicle_cmd.turninglight;
     msg[6] = vehicle_cmd.headlight;
 
-    // Byte order: Big-endian
+    /* Byte order: Big-endian */
     msg[2] = (int16_angle >> 8) & 0x00ff;
     msg[3] = int16_angle & 0x00ff;
 
@@ -80,6 +84,7 @@ void serial_steering_write(SerialPort *serialPort)
     int pulse = (int) (vehicle_cmd.steering_angle / pulse_to_degree);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
+    wait_serial(serial_time);
     serialPort->Write(angle_write(std::to_string(pulse)));
     while (serialPort->Available() && !findEnd) {
         std::string readData;
@@ -91,6 +96,7 @@ void serial_steering_write(SerialPort *serialPort)
             }
         }
     }
+    GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
 }
@@ -101,6 +107,7 @@ void serial_steering_read(SerialPort *serialPort)
     int sign = 0;
     int pluse = 0;
     pthread_mutex_lock(&mutex);
+    wait_serial(serial_time);
     serialPort->Write("rabs@");
     while (serialPort->Available() && !findEnd) {
         std::string readData;
@@ -118,6 +125,7 @@ void serial_steering_read(SerialPort *serialPort)
             }
         }
     }
+    GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     if (findEnd && sign != 0)
         vehicle_info.steering_angle = sign * pluse * pulse_to_degree;
@@ -128,6 +136,7 @@ void hold_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
+    wait_serial(serial_time);
     serialPort->Write("hold 0@");
     while (serialPort->Available() && !findEnd) {
         std::string readData;
@@ -139,6 +148,7 @@ void hold_steering(SerialPort *serialPort)
             }
         }
     }
+    GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
 }
@@ -147,6 +157,7 @@ void free_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
+    wait_serial(serial_time);
     serialPort->Write("hold 1@");
     while (serialPort->Available() && !findEnd) {
         std::string readData;
@@ -158,6 +169,7 @@ void free_steering(SerialPort *serialPort)
             }
         }
     }
+    GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
 }
@@ -176,52 +188,52 @@ static void *CAN_SERIAL_Info_Sender(void *args)
     while (ros::ok() && !willExit) {
         ros::spinOnce();
         switch (vehicle_cmd.modeValue) {
-            case 1:  // autonomous driving control
-                if (vehicle_info.control_mode == AUTONOMOUS) {
-                    vehicle_control();
-                    checkRange();
-                    Kvaser_canbus_write();
-                    if (steering_status != STEERINGHOLD) {
-                        hold_steering(serialPort);
-                        steering_status = STEERINGHOLD;
-                    }
-                    serial_steering_write(serialPort);
-                } else {
-                    if (steering_status != STEERINGFREE) {
-                        free_steering(serialPort);
-                        steering_status = STEERINGFREE;
-                    }
-                    cmd_reset();
-                    std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
+        case 1: /* autonomous driving control */
+            if (vehicle_info.control_mode == AUTONOMOUS) {
+                vehicle_control();
+                checkRange();
+                Kvaser_canbus_write();
+                if (steering_status != STEERINGHOLD) {
+                    hold_steering(serialPort);
+                    steering_status = STEERINGHOLD;
                 }
-                break;
-            case 2:  // UI direct control
-                if (vehicle_info.control_mode == AUTONOMOUS) {
-                    checkRange();
-                    Kvaser_canbus_write();
-                    if (steering_status != STEERINGHOLD) {
-                        hold_steering(serialPort);
-                        steering_status = STEERINGHOLD;
-                    }
-                    serial_steering_write(serialPort);
-                } else {
-                    if (steering_status != STEERINGFREE) {
-                        free_steering(serialPort);
-                        steering_status = STEERINGFREE;
-                    }
-                    cmd_reset();
-                    std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
-                }
-                break;
-            default:
+                serial_steering_write(serialPort);
+            } else {
                 if (steering_status != STEERINGFREE) {
                     free_steering(serialPort);
                     steering_status = STEERINGFREE;
                 }
                 cmd_reset();
-                break;
+                std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
+            }
+            break;
+        case 2: /* UI direct control */
+            if (vehicle_info.control_mode == AUTONOMOUS) {
+                checkRange();
+                Kvaser_canbus_write();
+                if (steering_status != STEERINGHOLD) {
+                    hold_steering(serialPort);
+                    steering_status = STEERINGHOLD;
+                }
+                serial_steering_write(serialPort);
+            } else {
+                if (steering_status != STEERINGFREE) {
+                    free_steering(serialPort);
+                    steering_status = STEERINGFREE;
+                }
+                cmd_reset();
+                std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
+            }
+            break;
+        default:
+            if (steering_status != STEERINGFREE) {
+                free_steering(serialPort);
+                steering_status = STEERINGFREE;
+            }
+            cmd_reset();
+            break;
         }
-        
+
         rate.sleep();
     }
 
@@ -263,7 +275,7 @@ static void *CAN_Info_Receiver(void *args)
     checkCAN("canSetBusParams", stat);
     canBusOn(hnd);
     std::cout << GREEN << "[ezgo_control::CAN_Info_Receiver] can open done, Channel " << CAN_CHANNEL << RESET << std::endl;
-    
+
     while (ros::ok() && !willExit) {
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
@@ -285,7 +297,7 @@ static void *CAN_Info_Receiver(void *args)
                 std::cout << "---------------" << std::endl;
                 std::cout << RED << "analog brake : " << analog_brake << RESET << std::endl;
                 std::cout << GREEN << "analog throttle : " << analog_throttle << RESET << std::endl;
-            } 
+            }
         }
         showVehicleInfo();
     }
@@ -295,11 +307,12 @@ static void *CAN_Info_Receiver(void *args)
 
 bool init_steering_angle(SerialPort *serialPort)
 {
-    ros::Rate rate(10);
+    wait_serial(serial_time);
     serialPort->Write("sabs 0@");
-    rate.sleep();
+    GetTickCount(serial_time);
+    wait_serial(serial_time);
     serialPort->Write("hold 1@");
-    rate.sleep();
+    GetTickCount(serial_time);
     return true;
 }
 

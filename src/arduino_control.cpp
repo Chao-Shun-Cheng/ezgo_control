@@ -77,7 +77,8 @@ static void *reader_handler(void *args)
         if (readData.size() == READ_LENGTH) {
             vehicle_info.brake = readData[0];
             vehicle_info.throttle = readData[1];
-            vehicle_info.steering_angle = (float) ((int16_t)(((readData[2] << 8) & 0xff00) + readData[3]) - vehicle_config.steering_offset);
+            vehicle_info.steering_angle =
+                (float) ((int16_t)(((readData[2] << 8) & 0xff00) + readData[3]) - vehicle_config.steering_offset);
             vehicle_info.velocity = (float) ((int16_t)(((readData[4] << 8) & 0xff00) + readData[5]));
             vehicle_info.velocity /= 1000.0;
             vehicle_info.shift = readData[6] & 0x03;
