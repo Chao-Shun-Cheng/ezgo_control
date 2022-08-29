@@ -339,6 +339,9 @@ int main(int argc, char **argv)
     sub[4] = nh.subscribe("/steer_cmd", 1, steerCMDCallback);
     sub[5] = nh.subscribe("/brake_cmd", 1, brakeCMDCallback);
 
+    ros::Publisher vel_pub;
+    vel_pub = nh.advertise<geometry_msgs::TwistStamped>("can_velocity", 10);
+
     pthread_t thread_CAN_SERIAL_writer;
     pthread_t thread_CAN_reader;
     pthread_t thread_SERIAL_reader;
@@ -371,6 +374,15 @@ int main(int argc, char **argv)
     if (pthread_detach(thread_SERIAL_reader) != 0) {
         std::perror("pthread_detach");
         std::exit(1);
+    }
+
+    ros::Rate rate(50);
+    geometry_msgs::TwistStamped velocity;
+    while (ros::ok() && !willExit) {
+        velocity.header.stamp = ros::Time::now();
+        velocity.twist.linear.x = vehicle_info.velocity / KMH_TO_MS;
+        vel_pub.publish(velocity);
+        rate.sleep();
     }
 
     ros::waitForShutdown();
