@@ -21,7 +21,7 @@ using namespace mn::CppLinuxSerial;
  */
 #define pulse_to_degree 0.009375
 #define angle_write(pluse) ("abs " + pluse + "@")
-#define wait_serial_time 0.01 /* [10 ms] */
+#define wait_serial_time 0.05 /* [50 ms] */
 #define wait_serial(serial_time) while (GetTimeDiffNow(serial_time) > wait_serial_time)
 
 pthread_mutex_t mutex;
@@ -84,18 +84,9 @@ void serial_steering_write(SerialPort *serialPort)
     int pulse = (int) (vehicle_cmd.steering_angle / pulse_to_degree);
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
-    wait_serial(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time) 
+        ;
     serialPort->Write(angle_write(std::to_string(pulse)));
-    while (serialPort->Available() && !findEnd) {
-        std::string readData;
-        serialPort->Read(readData);
-        for (int i = 0; i < readData.size(); i++) {
-            if (readData[i] == '>') {
-                findEnd = true;
-                break;
-            }
-        }
-    }
     GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
@@ -107,7 +98,8 @@ void serial_steering_read(SerialPort *serialPort)
     int sign = 0;
     int pluse = 0;
     pthread_mutex_lock(&mutex);
-    wait_serial(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time)
+        ;
     serialPort->Write("rabs@");
     while (serialPort->Available() && !findEnd) {
         std::string readData;
@@ -136,18 +128,9 @@ void hold_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
-    wait_serial(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time)
+        ;
     serialPort->Write("hold 0@");
-    while (serialPort->Available() && !findEnd) {
-        std::string readData;
-        serialPort->Read(readData);
-        for (int i = 0; i < readData.size(); i++) {
-            if (readData[i] == '!') {
-                findEnd = true;
-                break;
-            }
-        }
-    }
     GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
@@ -157,18 +140,9 @@ void free_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
     pthread_mutex_lock(&mutex);
-    wait_serial(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time)
+        ;
     serialPort->Write("hold 1@");
-    while (serialPort->Available() && !findEnd) {
-        std::string readData;
-        serialPort->Read(readData);
-        for (int i = 0; i < readData.size(); i++) {
-            if (readData[i] == '!') {
-                findEnd = true;
-                break;
-            }
-        }
-    }
     GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     return;
@@ -203,7 +177,7 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                     free_steering(serialPort);
                     steering_status = STEERINGFREE;
                 }
-                cmd_reset();
+                // cmd_reset();
                 std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
             }
             break;
@@ -221,7 +195,7 @@ static void *CAN_SERIAL_Info_Sender(void *args)
                     free_steering(serialPort);
                     steering_status = STEERINGFREE;
                 }
-                cmd_reset();
+                // cmd_reset();
                 std::cout << RED << "Check Vehicle Contorl Switch ..." << RESET << std::endl;
             }
             break;
@@ -233,7 +207,6 @@ static void *CAN_SERIAL_Info_Sender(void *args)
             cmd_reset();
             break;
         }
-
         rate.sleep();
     }
 
@@ -291,13 +264,7 @@ static void *CAN_Info_Receiver(void *args)
                 vehicle_info.control_mode = msg[0];
                 vehicle_info.velocity = (float) ((uint16_t)(((msg[1] << 8) & 0xff00) + msg[2]));
                 vehicle_info.velocity /= 1000.0;
-            } else if (id == 0x1) {
-                int analog_brake = (int) ((uint16_t)(((msg[0] << 8) & 0xff00) + msg[1]));
-                int analog_throttle = (int) ((uint16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
-                std::cout << "---------------" << std::endl;
-                std::cout << RED << "analog brake : " << analog_brake << RESET << std::endl;
-                std::cout << GREEN << "analog throttle : " << analog_throttle << RESET << std::endl;
-            }
+            } 
         }
         showVehicleInfo();
     }
@@ -307,10 +274,14 @@ static void *CAN_Info_Receiver(void *args)
 
 bool init_steering_angle(SerialPort *serialPort)
 {
-    wait_serial(serial_time);
+    serialPort->Write("plc 2@");
+    GetTickCount(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time)
+        ;
     serialPort->Write("sabs 0@");
     GetTickCount(serial_time);
-    wait_serial(serial_time);
+    while (GetTimeDiffNow(serial_time) < wait_serial_time)
+        ;
     serialPort->Write("hold 1@");
     GetTickCount(serial_time);
     return true;
