@@ -22,7 +22,6 @@ using namespace mn::CppLinuxSerial;
 #define pulse_to_degree 0.009375
 #define angle_write(pluse) ("abs " + pluse + "@")
 #define wait_serial_time 0.05 /* [50 ms] */
-#define wait_serial(serial_time) while (GetTimeDiffNow(serial_time) > wait_serial_time)
 
 pthread_mutex_t mutex;
 vehicle_info_t vehicle_info;
@@ -79,6 +78,11 @@ canStatus Kvaser_canbus_write()
     return stat;
 }
 
+/*
+ * This function can write the command angle of steering.
+ * Serial port will write the pulse. 
+ * @abs $val : Write the command pulse of steering motor.
+ */
 void serial_steering_write(SerialPort *serialPort)
 {
     int pulse = (int) (vehicle_cmd.steering_angle / pulse_to_degree);
@@ -92,11 +96,16 @@ void serial_steering_write(SerialPort *serialPort)
     return;
 }
 
+/*
+ * This function can read the current angle of steering.
+ * Serial port will read the pulse. (e.g. +000100000!)
+ * @rabs : Read the current pulse of steering motor.
+ */
 void serial_steering_read(SerialPort *serialPort)
 {
     bool findEnd = false;
     int sign = 0;
-    int pluse = 0;
+    int pulse = 0;
     pthread_mutex_lock(&mutex);
     while (GetTimeDiffNow(serial_time) < wait_serial_time)
         ;
@@ -110,7 +119,7 @@ void serial_steering_read(SerialPort *serialPort)
             if (readData[i] == '-')
                 sign = -1;
             if (readData[i] >= '0' && readData[i] <= '9')
-                pluse = pluse * 10 + (readData[i] - '0');
+                pulse = pulse * 10 + (readData[i] - '0');
             if (readData[i] == '!') {
                 findEnd = true;
                 break;
@@ -120,10 +129,14 @@ void serial_steering_read(SerialPort *serialPort)
     GetTickCount(serial_time);
     pthread_mutex_unlock(&mutex);
     if (findEnd && sign != 0)
-        vehicle_info.steering_angle = sign * pluse * pulse_to_degree;
+        vehicle_info.steering_angle = sign * pulse * pulse_to_degree;
     return;
 }
 
+/*
+ * This function can lock the steering motor when vehicle is autonomous mode.
+ * @hold 0 : Lock motor.
+ */
 void hold_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
@@ -136,6 +149,10 @@ void hold_steering(SerialPort *serialPort)
     return;
 }
 
+/*
+ * This function can free the steering motor when vehicle is manual mode.
+ * @hold 1 : Free motor.
+ */
 void free_steering(SerialPort *serialPort)
 {
     bool findEnd = false;
@@ -272,6 +289,12 @@ static void *CAN_Info_Receiver(void *args)
     return nullptr;
 }
 
+/*
+ * Explanation the definition of ascii command.
+ * @plc 2 : Set steering controller no reply.
+ * @sabs 0 : Set current position as original point.
+ * @hold 1 : Free motor.
+ */
 bool init_steering_angle(SerialPort *serialPort)
 {
     serialPort->Write("plc 2@");
@@ -323,8 +346,9 @@ int main(int argc, char **argv)
     sub[4] = nh.subscribe("/steer_cmd", 1, steerCMDCallback);
     sub[5] = nh.subscribe("/brake_cmd", 1, brakeCMDCallback);
 
-    ros::Publisher vel_pub;
+    ros::Publisher vel_pub, can_pub;
     vel_pub = nh.advertise<geometry_msgs::TwistStamped>("can_velocity", 10);
+    can_pub = nh.advertise<autoware_can_msgs::CANInfo>("can_info", 10);
 
     pthread_t thread_CAN_SERIAL_writer;
     pthread_t thread_CAN_reader;
@@ -362,10 +386,19 @@ int main(int argc, char **argv)
 
     ros::Rate rate(50);
     geometry_msgs::TwistStamped velocity;
+    autoware_can_msgs::CANInfo can_msg;
     while (ros::ok() && !willExit) {
         velocity.header.stamp = ros::Time::now();
         velocity.twist.linear.x = vehicle_info.velocity / KMH_TO_MS;
         vel_pub.publish(velocity);
+
+        can_msg.header.stamp = ros::Time::now();
+        can_msg.brakepedal = vehicle_info.brake;
+        can_msg.angle = vehicle_info.steering_angle;
+        can_msg.speed = vehicle_info.velocity;
+        can_msg.drivepedal = vehicle_info.throttle;
+        can_msg.driveshift = vehicle_info.shift;
+        can_pub.publish(can_msg);
         rate.sleep();
     }
 

@@ -17,6 +17,7 @@
 #include <autoware_msgs/AccelCmd.h>
 #include <autoware_msgs/BrakeCmd.h>
 #include <autoware_msgs/SteerCmd.h>
+#include <autoware_can_msgs/CANInfo.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <std_msgs/Float32.h>
 #include <tablet_socket_msgs/gear_cmd.h>
@@ -241,7 +242,7 @@ void accellCMDCallback(const autoware_msgs::AccelCmd &accell)
 
 void brakeCMDCallback(const autoware_msgs::BrakeCmd &brake)
 {
-    vehicle_cmd.brake_stroke = brake.brake + vehicle_config.brake_offset;
+    vehicle_cmd.brake_stroke = brake.brake;
 }
 
 /*
