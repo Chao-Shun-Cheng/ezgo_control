@@ -9,9 +9,9 @@ using namespace mn::CppLinuxSerial;
 #define CAN_INFO_READ_TIMEOUT_INTERVAL 2
 #define CAN_WRITE_ID 0x040
 #define CAN_WRITE_DLC 7
-#define CAN_READ_ID1 0x060
+#define CAN_READ_ID1 0x060 
 #define CAN_READ_ID2 0x061
-
+#define CAN_READ_ID3 0x1
 /*
  * pulse to degree
  * This is change pulse of steering motor to steering degree.
@@ -270,8 +270,8 @@ static void *CAN_Info_Receiver(void *args)
         stat = canReadWait(hnd, &id, &msg, &dlc, &flag, &time, CAN_INFO_READ_TIMEOUT_INTERVAL);
         if (stat == canOK) {
             if (id == CAN_READ_ID1 && dlc == 7) {
-                vehicle_info.brake = msg[0];
-                vehicle_info.throttle = msg[1];
+                // vehicle_info.brake = msg[0];
+                // vehicle_info.throttle = msg[1];
                 // vehicle_info.steering_angle = (float) ((uint16_t)(((msg[2] <<
                 // 8) & 0xff00) + msg[3]) - vehicle_config.steering_offset);
                 vehicle_info.shift = msg[4];
@@ -281,7 +281,10 @@ static void *CAN_Info_Receiver(void *args)
                 vehicle_info.control_mode = msg[0];
                 vehicle_info.velocity = (float) ((uint16_t)(((msg[1] << 8) & 0xff00) + msg[2]));
                 vehicle_info.velocity /= 1000.0;
-            } 
+            } else if (id == CAN_READ_ID3 && dlc == 4) {
+                vehicle_info.brake = (float) ((uint16_t)(((msg[0] << 8) & 0xff00) + msg[1]));
+                vehicle_info.throttle = (float) ((uint16_t)(((msg[2] << 8) & 0xff00) + msg[3]));
+            }
         }
         showVehicleInfo();
     }
