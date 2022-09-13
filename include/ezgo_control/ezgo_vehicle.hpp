@@ -26,6 +26,7 @@
 #define KMH_TO_MS 3.6       /* [km/hr] -> [m/s] */
 #define CHANGE_SHIFT_TIME 3 /* [sec] */
 #define VELOCITY_BUFFER 3   /* [km/hr] */
+#define SHOWTIME 0.5        /* [sec] */
 
 #define RESET "\033[0m"
 #define BLACK "\033[30m"   /* Black */
@@ -359,7 +360,8 @@ void showVehicleInfo()
 {
     static struct timespec time;
     GetTickCount(time);
-
+    if (GetTimeDiffNow(time) < SHOWTIME)
+        return;
     if (vehicle_info.control_mode == MANUAL && vehicle_cmd.modeValue == 0) {
         std::cout << YELLOW << "------ Manual mode ------" << RESET << std::endl;
     } else if (vehicle_info.control_mode == AUTONOMOUS && vehicle_cmd.modeValue == 1) {
@@ -380,7 +382,7 @@ void showVehicleInfo()
             std::cout << "Software Control Value : 2 [UI direct control mode]" << std::endl;
     }
 
-    std::cout << "Time : " << time.tv_nsec << std::endl;
+    std::cout << "Time : " << time.tv_sec << std::endl;
 
     switch (vehicle_info.shift) {
     case PARKING:
